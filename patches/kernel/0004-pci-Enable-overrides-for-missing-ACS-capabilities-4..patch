@@ -51,13 +51,14 @@ Signed-off-by: Fabian Grünbichler <f.gruenbichler@proxmox.com>
 Signed-off-by: Thomas Lamprecht <t.lamprecht@proxmox.com>
 ---
  .../admin-guide/kernel-parameters.txt         |   9 ++
- drivers/pci/quirks.c                          | 102 ++++++++++++++++++
- 2 files changed, 111 insertions(+)
+ drivers/pci/quirks.c                          | 101 ++++++++++++++++++
+ 2 files changed, 110 insertions(+)
+
 diff --git a/Documentation/admin-guide/kernel-parameters.txt b/Documentation/admin-guide/kernel-parameters.txt
-index 7bc83f3d9bdf..3174f3bd126a 100644
+index 0a1731a0f..46377bb05 100644
 --- a/Documentation/admin-guide/kernel-parameters.txt
 +++ b/Documentation/admin-guide/kernel-parameters.txt
-@@ -3509,6 +3509,15 @@
+@@ -4287,6 +4287,15 @@
  		nomsi		[MSI] If the PCI_MSI kernel config parameter is
  				enabled, this kernel boot option can be used to
  				disable the use of MSI interrupts system-wide.
@@ -74,12 +75,12 @@ index 7bc83f3d9bdf..3174f3bd126a 100644
  				Safety option to keep boot IRQs enabled. This
  				should never be necessary.
 diff --git a/drivers/pci/quirks.c b/drivers/pci/quirks.c
-index ca9ed5774eb1..dae6f719cf84 100644
+index eeec1d6f9..4bfacd51f 100644
 --- a/drivers/pci/quirks.c
 +++ b/drivers/pci/quirks.c
-@@ -3544,6 +3544,106 @@ static void quirk_no_bus_reset(struct pci_dev *dev)
- 	dev->dev_flags |= PCI_DEV_FLAGS_NO_BUS_RESET;
- }
+@@ -3546,6 +3546,106 @@ DECLARE_PCI_FIXUP_FINAL(PCI_VENDOR_ID_INTEL, 0x0106, disable_igfx_irq);
+ DECLARE_PCI_FIXUP_FINAL(PCI_VENDOR_ID_INTEL, 0x010a, disable_igfx_irq);
+ DECLARE_PCI_FIXUP_FINAL(PCI_VENDOR_ID_INTEL, 0x0152, disable_igfx_irq);
  
 +static bool acs_on_downstream;
 +static bool acs_on_multifunction;
@@ -182,12 +183,13 @@ index ca9ed5774eb1..dae6f719cf84 100644
 +	return -ENOTTY;
 +}
  /*
-  * Some Atheros AR9xxx and QCA988x chips do not behave after a bus reset.
-  * The device will throw a Link Down error on AER-capable systems and
-@@ -4796,6 +4896,7 @@ static const struct pci_dev_acs_enabled {
- 	{ PCI_VENDOR_ID_ZHAOXIN, 0x9083, pci_quirk_mf_endpoint_acs },
- 	/* Zhaoxin Root/Downstream Ports */
+  * PCI devices which are on Intel chips can skip the 10ms delay
+  * before entering D3 mode.
+@@ -5114,6 +5214,7 @@ static const struct pci_dev_acs_enabled {
  	{ PCI_VENDOR_ID_ZHAOXIN, PCI_ANY_ID, pci_quirk_zhaoxin_pcie_ports_acs },
+ 	/* Wangxun nics */
+ 	{ PCI_VENDOR_ID_WANGXUN, PCI_ANY_ID, pci_quirk_wangxun_nic_acs },
 +	{ PCI_ANY_ID, PCI_ANY_ID, pcie_acs_overrides },
  	{ 0 }
  };
+ 
