@@ -114,6 +114,8 @@ debian/control: $(wildcard debian/*.in)
 	chmod +x debian/$(PMX_KERNEL_SERIES_PKG).postinst
 	chmod +x debian/$(PMX_HEADER_PKG).postinst
 	sed -e 's/@KVNAME@/$(KVNAME)/g' -e 's/@KVMAJMIN@/$(KERNEL_MAJMIN)/g' < debian/control.in > debian/control
+	sed -e 's/@KVMAJMIN@/$(KERNEL_MAJMIN)/g' -e 's/@KVER@/$(KERNEL_VERSION)/g' -e 's/@SHA1@/$(SHA1)/g' \
+		-e 's/@BUILDTIME@/$(shell date +"%a, %d %b %Y %T %z")/g' < debian/changelog.in > debian/changelog
 
 build: .compile_mark .tools_compile_mark .modules_compile_mark
 
