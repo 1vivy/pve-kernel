@@ -141,7 +141,7 @@ extract-kernel-version: submodule
 # shallow clone the ubuntu mainline repo at a specific SHA1
 clone-mainline:
 	git submodule update --init --depth 1 submodules/ubuntu-kernel
-	cd $(KERNEL_SRC_SUBMODULE); git fetch --depth 1 origin $(SHA1); git reset --hard $(SHA1)
+	cd $(KERNEL_SRC_SUBMODULE); git fetch --depth 1 origin +refs/tags/$(SHA1):refs/tags/$(SHA1); git reset --hard $(SHA1)
 
 .PHONY: upload
 upload: UPLOAD_DIST ?= $(DEB_DISTRIBUTION)
