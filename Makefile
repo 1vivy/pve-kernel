@@ -2,7 +2,7 @@ include /usr/share/dpkg/pkg-info.mk
 
 -include ubuntu-kernel_env.mk
 # TODO: also bump proxmox-kernel-meta if the default MAJ.MIN version changes!
-SHA1 ?= cod/mainline/v6.6-rc5
+KERNEL_SHA1 ?= cod/mainline/v6.6-rc5
 # increment KREL for every published package release!
 # rebuild packages with new KREL and run 'make abiupdate'
 KREL=1
@@ -95,6 +95,8 @@ debian.prepared: debian
 	@$(foreach dir, $(DIRS),echo "$(dir)=$($(dir))" >> $(BUILD_DIR)/debian/rules.d/env.mk;)
 	echo "KVNAME=$(KVNAME)" >> $(BUILD_DIR)/debian/rules.d/env.mk
 	echo "KERNEL_MAJMIN=$(KERNEL_MAJMIN)" >> $(BUILD_DIR)/debian/rules.d/env.mk
+	echo "KERNEL_VER=$(KERNEL_VER)" >> $(BUILD_DIR)/debian/rules.d/env.mk
+	echo "KERNEL_SHA1=$(KERNEL_SHA1)" >> $(BUILD_DIR)/debian/rules.d/env.mk
 	cd $(BUILD_DIR); debian/rules debian/control
 	touch $@
 
@@ -141,7 +143,7 @@ extract-kernel-version: submodule
 # shallow clone the ubuntu mainline repo at a specific SHA1
 clone-mainline:
 	git submodule update --init --depth 1 submodules/ubuntu-kernel
-	cd $(KERNEL_SRC_SUBMODULE); git fetch --depth 1 origin +refs/tags/$(SHA1):refs/tags/$(SHA1); git reset --hard $(SHA1)
+	cd $(KERNEL_SRC_SUBMODULE); git fetch --depth 1 origin +refs/tags/$(KERNEL_SHA1):refs/tags/$(KERNEL_SHA1); git reset --hard $(KERNEL_SHA1)
 
 .PHONY: upload
 upload: UPLOAD_DIST ?= $(DEB_DISTRIBUTION)
