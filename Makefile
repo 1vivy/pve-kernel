@@ -1,12 +1,11 @@
 include /usr/share/dpkg/pkg-info.mk
 
-# also bump proxmox-kernel-meta if the default MAJ.MIN version changes!
-KERNEL_MAJ=6
-KERNEL_MIN=2
-KERNEL_PATCHLEVEL=16
+-include ubuntu-kernel_env.mk
+# TODO: also bump proxmox-kernel-meta if the default MAJ.MIN version changes!
+SHA1 ?= cod/mainline/v6.6-rc5
 # increment KREL for every published package release!
 # rebuild packages with new KREL and run 'make abiupdate'
-KREL=18
+KREL=1
 
 KERNEL_MAJMIN=$(KERNEL_MAJ).$(KERNEL_MIN)
 KERNEL_VER=$(KERNEL_MAJMIN).$(KERNEL_PATCHLEVEL)
@@ -25,7 +24,7 @@ ifneq ($(ARCH), amd64)
 KERNEL_ARCH=$(ARCH)
 endif
 
-SKIPABI=0
+SKIPABI=1
 
 BUILD_DIR=proxmox-kernel-$(KERNEL_VER)
 
@@ -82,6 +81,7 @@ $(BUILD_DIR).prepared: $(addsuffix .prepared,$(KERNEL_SRC) $(MODULES) debian)
 .PHONY: build-dir-fresh
 build-dir-fresh:
 	$(MAKE) clean
+	$(MAKE) extract-kernel-version
 	$(MAKE) $(BUILD_DIR).prepared
 	echo "created build-directory: $(BUILD_DIR).prepared/"
 
@@ -89,7 +89,8 @@ debian.prepared: debian
 	rm -rf $(BUILD_DIR)/debian
 	mkdir -p $(BUILD_DIR)
 	cp -a debian $(BUILD_DIR)/debian
-	echo "git clone git://git.proxmox.com/git/pve-kernel.git\\ngit checkout $(shell git rev-parse HEAD)" \
+	echo -e "git clone $(shell git remote get-url origin)\ngit checkout $(shell git rev-parse HEAD)\n" \
+	    "git clone $(shell git config --file .gitmodules submodule.$(KERNEL_SRC_SUBMODULE).url)\ngit checkout $(shell git submodule status $(KERNEL_SRC_SUBMODULE) | cut -d' ' -f2)" \
 	    >$(BUILD_DIR)/debian/SOURCE
 	@$(foreach dir, $(DIRS),echo "$(dir)=$($(dir))" >> $(BUILD_DIR)/debian/rules.d/env.mk;)
 	echo "KVNAME=$(KVNAME)" >> $(BUILD_DIR)/debian/rules.d/env.mk
@@ -97,7 +98,7 @@ debian.prepared: debian
 	cd $(BUILD_DIR); debian/rules debian/control
 	touch $@
 
-$(KERNEL_SRC).prepared: $(KERNEL_SRC_SUBMODULE) | submodule
+$(KERNEL_SRC).prepared: $(KERNEL_SRC_SUBMODULE)
 	rm -rf $(BUILD_DIR)/$(KERNEL_SRC) $@
 	mkdir -p $(BUILD_DIR)
 	cp -a $(KERNEL_SRC_SUBMODULE) $(BUILD_DIR)/$(KERNEL_SRC)
@@ -124,6 +125,24 @@ $(ZFSDIR).prepared: $(ZFSONLINUX_SUBMODULE)
 	rm -rf $(BUILD_DIR)/$(MODULES)/tmp
 	touch $(ZFSDIR).prepared
 
+# extract kernel version
+extract-kernel-version: submodule
+	rm -f ubuntu-kernel_env.mk
+	$(eval VERSION := $(shell grep "^VERSION =" $(KERNEL_SRC_SUBMODULE)/Makefile | cut -d' ' -f3))
+	$(eval PATCHLEVEL := $(shell grep "^PATCHLEVEL =" $(KERNEL_SRC_SUBMODULE)/Makefile | cut -d' ' -f3))
+	$(eval SUBLEVEL := $(shell grep "^SUBLEVEL =" $(KERNEL_SRC_SUBMODULE)/Makefile | cut -d' ' -f3))
+	$(eval KERNEL_MAJ := $(VERSION))
+	$(eval KERNEL_MIN := $(PATCHLEVEL))
+	$(eval KERNEL_PATCHLEVEL := $(SUBLEVEL))
+	echo "KERNEL_MAJ=$(KERNEL_MAJ)" >> ubuntu-kernel_env.mk
+	echo "KERNEL_MIN=$(KERNEL_MIN)" >> ubuntu-kernel_env.mk
+	echo "KERNEL_PATCHLEVEL=$(KERNEL_PATCHLEVEL)" >> ubuntu-kernel_env.mk
+
+# shallow clone the ubuntu mainline repo at a specific SHA1
+clone-mainline:
+	git submodule update --init --depth 1 submodules/ubuntu-kernel
+	cd $(KERNEL_SRC_SUBMODULE); git fetch --depth 1 origin $(SHA1); git reset --hard $(SHA1)
+
 .PHONY: upload
 upload: UPLOAD_DIST ?= $(DEB_DISTRIBUTION)
 upload: $(DEBS)
@@ -136,13 +155,12 @@ distclean: clean
 # upgrade to current master
 .PHONY: update_modules
 update_modules: submodule
-	git submodule foreach 'git pull --ff-only origin master'
 	cd $(ZFSONLINUX_SUBMODULE); git pull --ff-only origin master
 
 # make sure submodules were initialized
 .PHONY: submodule
 submodule:
-	test -f "$(KERNEL_SRC_SUBMODULE)/README" || git submodule update --init $(KERNEL_SRC_SUBMODULE)
+	test -f "$(KERNEL_SRC_SUBMODULE)/README" || $(MAKE) clone-mainline
 	test -f "$(ZFSONLINUX_SUBMODULE)/Makefile" || git submodule update --init --recursive $(ZFSONLINUX_SUBMODULE)
 
 # call after ABI bump with header deb in working directory
