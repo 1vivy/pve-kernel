@@ -1,6 +1,6 @@
 [submodule "submodules/zfsonlinux"]
 	path = submodules/zfsonlinux
-	url = git://git.proxmox.com/git/zfsonlinux.git
+	url = https://github.com/1vivy/zfsonlinux
 [submodule "submodules/ubuntu-kernel"]
 	path = submodules/ubuntu-kernel
 	url = https://git.launchpad.net/~ubuntu-kernel-test/ubuntu/+source/linux/+git/mainline-crack

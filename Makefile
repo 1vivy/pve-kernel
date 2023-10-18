@@ -3,6 +3,7 @@ include /usr/share/dpkg/pkg-info.mk
 -include ubuntu-kernel_env.mk
 # TODO: also bump proxmox-kernel-meta if the default MAJ.MIN version changes!
 KERNEL_SHA1 ?= cod/mainline/v6.6-rc5
+ZFS_SHA1 ?= zfs-2.2.0
 # increment KREL for every published package release!
 # rebuild packages with new KREL and run 'make abiupdate'
 KREL=1
@@ -123,7 +124,7 @@ $(ZFSDIR).prepared: $(ZFSONLINUX_SUBMODULE)
 	rm -rf $(BUILD_DIR)/$(MODULES)/$(ZFSDIR) $(BUILD_DIR)/$(MODULES)/tmp $@
 	mkdir -p $(BUILD_DIR)/$(MODULES)/tmp
 	cp -a $(ZFSONLINUX_SUBMODULE)/* $(BUILD_DIR)/$(MODULES)/tmp
-	cd $(BUILD_DIR)/$(MODULES)/tmp; make kernel
+	cd $(BUILD_DIR)/$(MODULES)/tmp; make kernel SHA1=$(ZFS_SHA1)
 	rm -rf $(BUILD_DIR)/$(MODULES)/tmp
 	touch $(ZFSDIR).prepared
 
