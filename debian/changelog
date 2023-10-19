@@ -1,0 +1,5 @@
+proxmox-kernel-6.6 (6.6.0) bookworm; urgency=low
+
+  Mainline build at commit: @KSHA1@
+
+  -- 1vivy <1vivy@tutanota.com>  Wed, 18 Oct 2023 22:03:23 -0600

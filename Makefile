@@ -96,8 +96,6 @@ debian.prepared: debian
 	@$(foreach dir, $(DIRS),echo "$(dir)=$($(dir))" >> $(BUILD_DIR)/debian/rules.d/env.mk;)
 	echo "KVNAME=$(KVNAME)" >> $(BUILD_DIR)/debian/rules.d/env.mk
 	echo "KERNEL_MAJMIN=$(KERNEL_MAJMIN)" >> $(BUILD_DIR)/debian/rules.d/env.mk
-	echo "KERNEL_VER=$(KERNEL_VER)" >> $(BUILD_DIR)/debian/rules.d/env.mk
-	echo "KERNEL_SHA1=$(KERNEL_SHA1)" >> $(BUILD_DIR)/debian/rules.d/env.mk
 	cd $(BUILD_DIR); debian/rules debian/control
 	touch $@
 
@@ -145,6 +143,11 @@ extract-kernel-version: submodule
 clone-mainline:
 	git submodule update --init --depth 1 submodules/ubuntu-kernel
 	cd $(KERNEL_SRC_SUBMODULE); git fetch --depth 1 origin +refs/tags/$(KERNEL_SHA1):refs/tags/$(KERNEL_SHA1); git reset --hard $(KERNEL_SHA1)
+
+debian-changelog:
+	rm -f debian/changelog
+	sed -e 's/@KVMAJMIN@/$(KERNEL_MAJMIN)/g' -e 's/@KVER@/$(KERNEL_VER)/g' -e 's|@KERNEL_SHA1@|$(KERNEL_SHA1)|g' \
+		-e 's/@BUILDTIME@/$(shell date +"%a, %d %b %Y %T %z")/g' < debian/changelog.in > debian/changelog
 
 .PHONY: upload
 upload: UPLOAD_DIST ?= $(DEB_DISTRIBUTION)
