@@ -121,8 +121,9 @@ $(MODULES).prepared: $(addsuffix .prepared,$(MODULE_DIRS))
 $(ZFSDIR).prepared: $(ZFSONLINUX_SUBMODULE)
 	rm -rf $(BUILD_DIR)/$(MODULES)/$(ZFSDIR) $(BUILD_DIR)/$(MODULES)/tmp $@
 	mkdir -p $(BUILD_DIR)/$(MODULES)/tmp
+	cd $(ZFSONLINUX_SUBMODULE); make clone-upstream SHA1=$(ZFS_SHA1); make debian-changelog SHA1=$(ZFS_SHA1)
 	cp -a $(ZFSONLINUX_SUBMODULE)/* $(BUILD_DIR)/$(MODULES)/tmp
-	cd $(BUILD_DIR)/$(MODULES)/tmp; make clone-upstream SHA1=$(ZFS_SHA1); make debian-changelog SHA1=$(ZFS_SHA1); make kernel SHA1=$(ZFS_SHA1)
+	cd $(BUILD_DIR)/$(MODULES)/tmp; make kernel SHA1=$(ZFS_SHA1)
 	rm -rf $(BUILD_DIR)/$(MODULES)/tmp
 	touch $(ZFSDIR).prepared
 
