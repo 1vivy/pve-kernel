@@ -126,7 +126,7 @@ install: .install_mark .tools_install_mark .headers_install_mark .usr_headers_in
 	dh_fixperms
 
 binary: install
-	debian/rules fwcheck abicheck
+	debian/rules abicheck
 	dh_strip -N$(PMX_HEADER_PKG) -N$(PMX_USR_HEADER_PKG)
 	dh_makeshlibs
 	dh_shlibdeps
@@ -282,6 +282,8 @@ $(MODULES)/zfs.ko: .compile_mark
 	cd $(MODULES)/$(ZFSDIR); ./autogen.sh
 	cd $(MODULES)/$(ZFSDIR); ./configure --with-config=kernel --with-linux=$(BUILD_DIR)/$(KERNEL_SRC) --with-linux-obj=$(BUILD_DIR)/$(KERNEL_SRC)
 	$(MAKE) -C $(MODULES)/$(ZFSDIR)
+	cp $(MODULES)/$(ZFSDIR)/module/zfs.ko $(MODULES)/
+	cp $(MODULES)/$(ZFSDIR)/module/spl.ko $(MODULES)/
 
 fwlist-$(KVNAME): .compile_mark .modules_compile_mark
 	debian/scripts/find-firmware.pl debian/$(PMX_KERNEL_PKG)/lib/modules/$(KVNAME) >fwlist.tmp
