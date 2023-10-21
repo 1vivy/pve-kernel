@@ -14,8 +14,8 @@ jobs:
     steps:
     - name: Setup container environment
       run: |
-        sudo apt-get update
-        sudo apt-get install -y git gh
+        apt-get update
+        apt-get install -y git gh
 
     - name: Checkout code
       uses: actions/checkout@v2
@@ -36,8 +36,8 @@ jobs:
     # Install necessary packages
     - name: Setup build environment
       run: |
-        sudo apt-get update
-        sudo apt-get install -y build-essential git git-email debhelper pve-doc-generator devscripts python-is-python3 dh-python sphinx-common quilt libtraceevents-dev libunwind-dev libzstd-dev png-config equivs
+        apt-get update
+        apt-get install -y build-essential git git-email debhelper pve-doc-generator devscripts python-is-python3 dh-python sphinx-common quilt libtraceevents-dev libunwind-dev libzstd-dev png-config equivs
 
     # Execute mk-build-deps
     - name: Execute mk-build-deps for control files
