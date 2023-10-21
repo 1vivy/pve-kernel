@@ -121,7 +121,6 @@ $(MODULES).prepared: $(addsuffix .prepared,$(MODULE_DIRS))
 $(ZFSDIR).prepared: $(ZFSONLINUX_SUBMODULE)
 	rm -rf $(BUILD_DIR)/$(MODULES)/$(ZFSDIR) $(BUILD_DIR)/$(MODULES)/tmp $@
 	mkdir -p $(BUILD_DIR)/$(MODULES)/tmp
-	cd $(ZFSONLINUX_SUBMODULE); make clone-upstream SHA1=$(ZFS_SHA1); make debian-changelog SHA1=$(ZFS_SHA1)
 	cp -a $(ZFSONLINUX_SUBMODULE)/* $(BUILD_DIR)/$(MODULES)/tmp
 	cd $(BUILD_DIR)/$(MODULES)/tmp; make kernel SHA1=$(ZFS_SHA1)
 	rm -rf $(BUILD_DIR)/$(MODULES)/tmp
@@ -149,6 +148,9 @@ debian-changelog:
 	rm -f debian/changelog
 	sed -e 's/@KVMAJMIN@/$(KERNEL_MAJMIN)/g' -e 's/@KVER@/$(KERNEL_VER)/g' -e 's|@KERNEL_SHA1@|$(KERNEL_SHA1)|g' \
 		-e 's/@BUILDTIME@/$(shell date +"%a, %d %b %Y %T %z")/g' < debian/changelog.in > debian/changelog
+
+$(ZFSONLINUX_SUBMODULE)-changelog:
+	cd $(ZFSONLINUX_SUBMODULE); make clone-upstream SHA1=$(ZFS_SHA1); make debian-changelog SHA1=$(ZFS_SHA1)
 
 .PHONY: upload
 upload: UPLOAD_DIST ?= $(DEB_DISTRIBUTION)
