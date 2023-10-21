@@ -126,7 +126,7 @@ $(ZFSDIR).prepared: $(ZFSONLINUX_SUBMODULE)
 	touch $(ZFSDIR).prepared
 
 # extract kernel version
-extract-kernel-version: submodule
+extract-kernel-version:
 	rm -f ubuntu-kernel_env.mk
 	$(eval VERSION := $(shell grep "^VERSION =" $(KERNEL_SRC_SUBMODULE)/Makefile | cut -d' ' -f3))
 	$(eval PATCHLEVEL := $(shell grep "^PATCHLEVEL =" $(KERNEL_SRC_SUBMODULE)/Makefile | cut -d' ' -f3))
@@ -152,8 +152,12 @@ debian-changelog:
 	sed -e 's/@KVMAJMIN@/$(KERNEL_MAJMIN)/g' -e 's/@KVER@/$(KERNEL_VER)$(KERNEL_EXTRAVERSION)/g' -e 's|@KSHA1@|$(KERNEL_SHA1)|g' \
 		-e 's/@BUILDTIME@/$(shell date +"%a, %d %b %Y %T %z")/g' < debian/changelog.in > debian/changelog
 
-$(ZFSONLINUX_SUBMODULE)-changelog:
-	cd $(ZFSONLINUX_SUBMODULE); make clone-upstream SHA1=$(ZFS_SHA1); make debian-changelog SHA1=$(ZFS_SHA1)
+.PHONY: prep
+prep: submodule
+	extract-kernel-version
+	debian-changelog
+	cd $(ZFSONLINUX_SUBMODULE); make clone-upstream SHA1=$(ZFS_SHA1)
+	cd $(ZFSONLINUX_SUBMODULE); make debian-changelog SHA1=$(ZFS_SHA1)
 
 .PHONY: upload
 upload: UPLOAD_DIST ?= $(DEB_DISTRIBUTION)
