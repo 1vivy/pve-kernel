@@ -11,8 +11,12 @@ jobs:
     container:
       image: debian:bookworm
 
-
     steps:
+    - name: Setup container environment
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y git gh
+
     - name: Checkout code
       uses: actions/checkout@v2
       with:
