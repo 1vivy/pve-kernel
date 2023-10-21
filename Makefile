@@ -6,12 +6,11 @@ KERNEL_SHA1 ?= cod/mainline/v6.6-rc5
 ZFS_SHA1 ?= zfs-2.2.0
 # increment KREL for every published package release!
 # rebuild packages with new KREL and run 'make abiupdate'
-KREL=1
 
 KERNEL_MAJMIN=$(KERNEL_MAJ).$(KERNEL_MIN)
 KERNEL_VER=$(KERNEL_MAJMIN).$(KERNEL_PATCHLEVEL)
 
-EXTRAVERSION=-$(KREL)-pve
+EXTRAVERSION=$(KERNEL_EXTRAVERSION)-pve
 KVNAME=$(KERNEL_VER)$(EXTRAVERSION)
 PACKAGE=proxmox-kernel-$(KVNAME)
 HDRPACKAGE=proxmox-headers-$(KVNAME)
@@ -42,14 +41,14 @@ MODULE_DIRS=$(ZFSDIR)
 # exported to debian/rules via debian/rules.d/dirs.mk
 DIRS=KERNEL_SRC ZFSDIR MODULES
 
-DSC=proxmox-kernel-$(KERNEL_MAJMIN)_$(KERNEL_VER)-$(KREL).dsc
-DST_DEB=$(PACKAGE)_$(KERNEL_VER)-$(KREL)_$(ARCH).deb
-META_DEB=proxmox-kernel-$(KERNEL_MAJMIN)_$(KERNEL_VER)-$(KREL)_all.deb
-HDR_DEB=$(HDRPACKAGE)_$(KERNEL_VER)-$(KREL)_$(ARCH).deb
-META_HDR_DEB=proxmox-headers-$(KERNEL_MAJMIN)_$(KERNEL_VER)-$(KREL)_all.deb
-USR_HDR_DEB=proxmox-kernel-libc-dev_$(KERNEL_VER)-$(KREL)_$(ARCH).deb
-LINUX_TOOLS_DEB=linux-tools-$(KERNEL_MAJMIN)_$(KERNEL_VER)-$(KREL)_$(ARCH).deb
-LINUX_TOOLS_DBG_DEB=linux-tools-$(KERNEL_MAJMIN)-dbgsym_$(KERNEL_VER)-$(KREL)_$(ARCH).deb
+DSC=proxmox-kernel-$(KERNEL_MAJMIN)_$(KERNEL_VER)$(KERNEL_EXTRAVERSION).dsc
+DST_DEB=$(PACKAGE)_$(KERNEL_VER)$(KERNEL_EXTRAVERSION)_$(ARCH).deb
+META_DEB=proxmox-kernel-$(KERNEL_MAJMIN)_$(KERNEL_VER)$(KERNEL_EXTRAVERSION)_all.deb
+HDR_DEB=$(HDRPACKAGE)_$(KERNEL_VER)$(KERNEL_EXTRAVERSION)_$(ARCH).deb
+META_HDR_DEB=proxmox-headers-$(KERNEL_MAJMIN)_$(KERNEL_VER)$(KERNEL_EXTRAVERSION)_all.deb
+USR_HDR_DEB=proxmox-kernel-libc-dev_$(KERNEL_VER)$(KERNEL_EXTRAVERSION)_$(ARCH).deb
+LINUX_TOOLS_DEB=linux-tools-$(KERNEL_MAJMIN)_$(KERNEL_VER)$(KERNEL_EXTRAVERSION)_$(ARCH).deb
+LINUX_TOOLS_DBG_DEB=linux-tools-$(KERNEL_MAJMIN)-dbgsym_$(KERNEL_VER)$(KERNEL_EXTRAVERSION)_$(ARCH).deb
 
 DEBS=$(DST_DEB) $(META_DEB) $(HDR_DEB) $(META_HDR_DEB) $(LINUX_TOOLS_DEB) $(LINUX_TOOLS_DBG_DEB) # $(USR_HDR_DEB)
 
@@ -132,12 +131,16 @@ extract-kernel-version: submodule
 	$(eval VERSION := $(shell grep "^VERSION =" $(KERNEL_SRC_SUBMODULE)/Makefile | cut -d' ' -f3))
 	$(eval PATCHLEVEL := $(shell grep "^PATCHLEVEL =" $(KERNEL_SRC_SUBMODULE)/Makefile | cut -d' ' -f3))
 	$(eval SUBLEVEL := $(shell grep "^SUBLEVEL =" $(KERNEL_SRC_SUBMODULE)/Makefile | cut -d' ' -f3))
+	$(eval KEXTRAVERSION := $(shell grep "^EXTRAVERSION =" $(KERNEL_SRC_SUBMODULE)/Makefile | cut -d' ' -f3))
 	$(eval KERNEL_MAJ := $(VERSION))
 	$(eval KERNEL_MIN := $(PATCHLEVEL))
 	$(eval KERNEL_PATCHLEVEL := $(SUBLEVEL))
+	$(eval KERNEL_EXTRAVERSION := $(KEXTRAVERSION))
+
 	echo "KERNEL_MAJ=$(KERNEL_MAJ)" >> ubuntu-kernel_env.mk
 	echo "KERNEL_MIN=$(KERNEL_MIN)" >> ubuntu-kernel_env.mk
 	echo "KERNEL_PATCHLEVEL=$(KERNEL_PATCHLEVEL)" >> ubuntu-kernel_env.mk
+	echo "KERNEL_EXTRAVERSION=$(KERNEL_EXTRAVERSION)" >> ubuntu-kernel_env.mk
 
 # shallow clone the ubuntu mainline repo at a specific SHA1
 clone-mainline:
@@ -146,7 +149,7 @@ clone-mainline:
 
 debian-changelog:
 	rm -f debian/changelog
-	sed -e 's/@KVMAJMIN@/$(KERNEL_MAJMIN)/g' -e 's/@KVER@/$(KERNEL_VER)/g' -e 's|@KERNEL_SHA1@|$(KERNEL_SHA1)|g' \
+	sed -e 's/@KVMAJMIN@/$(KERNEL_MAJMIN)/g' -e 's/@KVER@/$(KERNEL_VER)$(KERNEL_EXTRAVERSION)/g' -e 's|@KSHA1@|$(KERNEL_SHA1)|g' \
 		-e 's/@BUILDTIME@/$(shell date +"%a, %d %b %Y %T %z")/g' < debian/changelog.in > debian/changelog
 
 $(ZFSONLINUX_SUBMODULE)-changelog:

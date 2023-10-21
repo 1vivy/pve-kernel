@@ -1,5 +1,5 @@
-proxmox-kernel-6.6 (6.6.0) bookworm; urgency=low
+proxmox-kernel-6.6 (6.6.0-rc5) bookworm; urgency=low
 
-  Mainline build at commit: @KSHA1@
+  Mainline build at commit: cod/mainline/v6.6-rc5
 
-  -- 1vivy <1vivy@tutanota.com>  Wed, 18 Oct 2023 22:03:23 -0600
+  -- 1vivy <1vivy@tutanota.com>  Sat, 21 Oct 2023 15:29:47 -0600
