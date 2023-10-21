@@ -51,7 +51,7 @@ jobs:
         key: ${{ runner.os }}-submodules-${{ hashFiles('.gitmodules') }}
   
   build:
-    runs-on: ubuntu-22.04
+    runs-on: pve-runner
 
     steps:
     - name: Checkout code
