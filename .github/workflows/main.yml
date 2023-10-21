@@ -11,45 +11,6 @@ on:
         required: true
 
 jobs:
-  setup-env:
-    runs-on: ubuntu-22.04
-
-    steps:
-    - name: Checkout code
-      uses: actions/checkout@v2
-      with:
-        submodules: 'recursive'
-
-    # Add Proxmox APT repository
-    - name: Add Proxmox repository to sources.list
-      run: echo "deb http://download.proxmox.com/debian/devel/ bookworm main" >> /etc/apt/sources.list
-
-    # Cache apt packages
-    - name: Cache apt packages
-      uses: actions/cache@v2
-      with:
-        path: /var/cache/apt/archives
-        key: ${{ runner.os }}-apt-${{ hashFiles('**/debian/control') }}
-
-    # Install necessary packages
-    - name: Setup build environment
-      run: |
-        sudo apt-get update
-        sudo apt-get install -y build-essential git git-email debhelper pve-doc-generator devscripts python-is-python3 dh-python sphinx-common quilt libtraceevents-dev libunwind-dev libzstd-dev png-config equivs
-
-    # Execute mk-build-deps
-    - name: Execute mk-build-deps for control files
-      run: |
-        mk-build-deps -ir proxmox-kernel-*/debian/control
-        mk-build-deps -ir proxmox-kernel-*/modules/pkg-zfs/debian/control
-
-    # Cache the submodules
-    - name: Cache submodules
-      uses: actions/cache@v2
-      with:
-        path: submodules/
-        key: ${{ runner.os }}-submodules-${{ hashFiles('.gitmodules') }}
-  
   build:
     runs-on: pve-runner
 
