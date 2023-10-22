@@ -152,12 +152,12 @@ debian-changelog:
 	sed -e 's/@KVMAJMIN@/$(KERNEL_MAJMIN)/g' -e 's/@KVER@/$(KERNEL_VER)$(KERNEL_EXTRAVERSION)/g' -e 's|@KSHA1@|$(KERNEL_SHA1)|g' \
 		-e 's/@BUILDTIME@/$(shell date +"%a, %d %b %Y %T %z")/g' < debian/changelog.in > debian/changelog
 
-.PHONY: prep
-prep: submodule
-	extract-kernel-version
-	debian-changelog
+$(ZFSONLINUX_SUBMODULE)-prep:
 	cd $(ZFSONLINUX_SUBMODULE); make clone-upstream SHA1=$(ZFS_SHA1)
 	cd $(ZFSONLINUX_SUBMODULE); make debian-changelog SHA1=$(ZFS_SHA1)
+
+.PHONY: prep
+prep: submodule	extract-kernel-version debian-changelog $(ZFSONLINUX_SUBMODULE)-prep
 
 .PHONY: upload
 upload: UPLOAD_DIST ?= $(DEB_DISTRIBUTION)
