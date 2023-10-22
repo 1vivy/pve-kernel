@@ -10,7 +10,7 @@ ZFS_SHA1 ?= zfs-2.2.0
 KERNEL_MAJMIN=$(KERNEL_MAJ).$(KERNEL_MIN)
 KERNEL_VER=$(KERNEL_MAJMIN).$(KERNEL_PATCHLEVEL)
 
-EXTRAVERSION=$(KERNEL_EXTRAVERSION)-pve
+EXTRAVERSION=$(KERNEL_EXTRAVERSION)-$(KREL)-pve
 KVNAME=$(KERNEL_VER)$(EXTRAVERSION)
 PACKAGE=proxmox-kernel-$(KVNAME)
 HDRPACKAGE=proxmox-headers-$(KVNAME)
@@ -41,14 +41,14 @@ MODULE_DIRS=$(ZFSDIR)
 # exported to debian/rules via debian/rules.d/dirs.mk
 DIRS=KERNEL_SRC ZFSDIR MODULES
 
-DSC=proxmox-kernel-$(KERNEL_MAJMIN)_$(KERNEL_VER)$(KERNEL_EXTRAVERSION).dsc
-DST_DEB=$(PACKAGE)_$(KERNEL_VER)$(KERNEL_EXTRAVERSION)_$(ARCH).deb
-META_DEB=proxmox-kernel-$(KERNEL_MAJMIN)_$(KERNEL_VER)$(KERNEL_EXTRAVERSION)_all.deb
-HDR_DEB=$(HDRPACKAGE)_$(KERNEL_VER)$(KERNEL_EXTRAVERSION)_$(ARCH).deb
-META_HDR_DEB=proxmox-headers-$(KERNEL_MAJMIN)_$(KERNEL_VER)$(KERNEL_EXTRAVERSION)_all.deb
-USR_HDR_DEB=proxmox-kernel-libc-dev_$(KERNEL_VER)$(KERNEL_EXTRAVERSION)_$(ARCH).deb
-LINUX_TOOLS_DEB=linux-tools-$(KERNEL_MAJMIN)_$(KERNEL_VER)$(KERNEL_EXTRAVERSION)_$(ARCH).deb
-LINUX_TOOLS_DBG_DEB=linux-tools-$(KERNEL_MAJMIN)-dbgsym_$(KERNEL_VER)$(KERNEL_EXTRAVERSION)_$(ARCH).deb
+DSC=proxmox-kernel-$(KERNEL_MAJMIN)_$(KERNEL_VER)-$(KREL).dsc
+DST_DEB=$(PACKAGE)_$(KERNEL_VER)$(KREL)_$(ARCH).deb
+META_DEB=proxmox-kernel-$(KERNEL_MAJMIN)_$(KERNEL_VER)-$(KREL)_all.deb
+HDR_DEB=$(HDRPACKAGE)_$(KERNEL_VER)$(KREL)_$(ARCH).deb
+META_HDR_DEB=proxmox-headers-$(KERNEL_MAJMIN)_$(KERNEL_VER)-$(KREL)_all.deb
+USR_HDR_DEB=proxmox-kernel-libc-dev_$(KERNEL_VER)$(KREL)_$(ARCH).deb
+LINUX_TOOLS_DEB=linux-tools-$(KERNEL_MAJMIN)_$(KERNEL_VER)-$(KREL)_$(ARCH).deb
+LINUX_TOOLS_DBG_DEB=linux-tools-$(KERNEL_MAJMIN)-dbgsym_$(KERNEL_VER)-$(KREL)_$(ARCH).deb
 
 DEBS=$(DST_DEB) $(META_DEB) $(HDR_DEB) $(META_HDR_DEB) $(LINUX_TOOLS_DEB) $(LINUX_TOOLS_DBG_DEB) # $(USR_HDR_DEB)
 
@@ -136,11 +136,15 @@ extract-kernel-version:
 	$(eval KERNEL_MIN := $(PATCHLEVEL))
 	$(eval KERNEL_PATCHLEVEL := $(SUBLEVEL))
 	$(eval KERNEL_EXTRAVERSION := $(KEXTRAVERSION))
+# totally not inline shell function
+	$(eval ABINUM := $(shell echo $(KERNEL_MAJ).$(KERNEL_MIN).$(KERNEL_PATCHLEVEL)-$(KERNEL_EXTRAVERSION) | awk -F'[.-]' '{ for (i = 1; i <= NF; i++) { if ($$i ~ /^[0-9][0-9]*$$/) { printf("%02d", $$i); } else { printf("%s", $$i); } } }'))
+	$(eval KREL := $(ABINUM)$(shell date +%Y%m%d%H%M))
 
 	echo "KERNEL_MAJ=$(KERNEL_MAJ)" >> ubuntu-kernel_env.mk
 	echo "KERNEL_MIN=$(KERNEL_MIN)" >> ubuntu-kernel_env.mk
 	echo "KERNEL_PATCHLEVEL=$(KERNEL_PATCHLEVEL)" >> ubuntu-kernel_env.mk
 	echo "KERNEL_EXTRAVERSION=$(KERNEL_EXTRAVERSION)" >> ubuntu-kernel_env.mk
+	echo "KREL=$(KREL)" >> ubuntu-kernel_env.mk
 
 # shallow clone the ubuntu mainline repo at a specific SHA1
 clone-mainline:
@@ -149,15 +153,12 @@ clone-mainline:
 
 debian-changelog:
 	rm -f debian/changelog
-	sed -e 's/@KVMAJMIN@/$(KERNEL_MAJMIN)/g' -e 's/@KVER@/$(KERNEL_VER)$(KERNEL_EXTRAVERSION)/g' -e 's|@KSHA1@|$(KERNEL_SHA1)|g' \
+	sed -e 's/@KVMAJMIN@/$(KERNEL_MAJMIN)/g' -e 's/@KVER@/$(KERNEL_VER)$(KERNEL_EXTRAVERSION)-$(KREL)/g' -e 's|@KSHA1@|$(KERNEL_SHA1)|g' \
 		-e 's/@BUILDTIME@/$(shell date +"%a, %d %b %Y %T %z")/g' < debian/changelog.in > debian/changelog
 
-$(ZFSONLINUX_SUBMODULE)-prep:
-	cd $(ZFSONLINUX_SUBMODULE); make clone-upstream SHA1=$(ZFS_SHA1)
-	cd $(ZFSONLINUX_SUBMODULE); make debian-changelog SHA1=$(ZFS_SHA1)
-
 .PHONY: prep
-prep: submodule	extract-kernel-version debian-changelog $(ZFSONLINUX_SUBMODULE)-prep
+prep: submodule	clone-mainline extract-kernel-version debian-changelog
+	cd $(ZFSONLINUX_SUBMODULE); make prep SHA1=$(ZFS_SHA1)
 
 .PHONY: upload
 upload: UPLOAD_DIST ?= $(DEB_DISTRIBUTION)
@@ -176,7 +177,7 @@ update_modules: submodule
 # make sure submodules were initialized
 .PHONY: submodule
 submodule:
-	test -f "$(KERNEL_SRC_SUBMODULE)/README" || $(MAKE) clone-mainline
+	test -f "$(KERNEL_SRC_SUBMODULE)/README" || git submodule update --init $(KERNEL_SRC_SUBMODULE)
 	test -f "$(ZFSONLINUX_SUBMODULE)/Makefile" || git submodule update --init --recursive $(ZFSONLINUX_SUBMODULE)
 
 # call after ABI bump with header deb in working directory
