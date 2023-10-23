@@ -1,3 +1,21 @@
+MAINLINE PROXMOX KERNEL BUILD:
+=============
+
+This repo builds mainline kernels with proxmox modifications. It uses Ubuntu
+mainline kernel repo, and Openzfs upstream:
+
+ https://git.launchpad.net/~ubuntu-kernel-test/ubuntu/+source/linux/+git/mainline-crack
+ https://github.com/openzfs/zfs
+
+You can set ZFS_SHA1= and KERNEL_SHA1= to appropiate git tag/commit.
+Run `make prep ZFS_SHA1=__SHA1__ KERNEL_SHA1=__SHA1__` before building anything.
+
+TODO:
+ * Make debian modifications in `make prep` work inline with debian building
+ * Automate releases and publish to an APT repo
+ * Rebase patches time to time workflow
+ * Refactor git history...
+
 KERNEL SOURCE:
 ==============
 
