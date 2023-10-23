@@ -98,7 +98,10 @@ PMX_CONFIG_OPTS= \
 --set-str CONFIG_LSM lockdown,yama,integrity,apparmor \
 -e CONFIG_PAGE_TABLE_ISOLATION \
 -e CONFIG_ARCH_HAS_CPU_FINALIZE_INIT \
--d CONFIG_GDS_FORCE_MITIGATION
+-d CONFIG_GDS_FORCE_MITIGATION \
+-d CONFIG_UBSAN \
+-D CONFIG_MODULE_SIG_ALL CONFIG_MODULE_SIG_FORCE
+
 
 debian/control: $(wildcard debian/*.in)
 	sed -e 's/@@KVNAME@@/$(KVNAME)/g' < debian/proxmox-kernel.prerm.in > debian/$(PMX_KERNEL_PKG).prerm

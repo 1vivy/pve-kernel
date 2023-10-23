@@ -1,0 +1,1052 @@
+From mboxrd@z Thu Jan  1 00:00:00 1970
+Return-Path: <linux-usb-owner@vger.kernel.org>
+X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
+	aws-us-west-2-korg-lkml-1.web.codeaurora.org
+Received: from vger.kernel.org (vger.kernel.org [23.128.96.18])
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 71932CA0ECD
+	for <linux-usb@archiver.kernel.org>; Mon, 11 Sep 2023 21:40:36 +0000 (UTC)
+Received: (majordomo@vger.kernel.org) by vger.kernel.org via listexpand
+        id S1350384AbjIKVhq (ORCPT <rfc822;linux-usb@archiver.kernel.org>);
+        Mon, 11 Sep 2023 17:37:46 -0400
+Received: from lindbergh.monkeyblade.net ([23.128.96.19]:39586 "EHLO
+        lindbergh.monkeyblade.net" rhost-flags-OK-OK-OK-OK) by vger.kernel.org
+        with ESMTP id S236254AbjIKKEz (ORCPT
+        <rfc822;linux-usb@vger.kernel.org>); Mon, 11 Sep 2023 06:04:55 -0400
+Received: from mgamail.intel.com (mgamail.intel.com [192.55.52.120])
+        by lindbergh.monkeyblade.net (Postfix) with ESMTPS id 1C1D0E68
+        for <linux-usb@vger.kernel.org>; Mon, 11 Sep 2023 03:04:51 -0700 (PDT)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple;
+  d=intel.com; i=@intel.com; q=dns/txt; s=Intel;
+  t=1694426691; x=1725962691;
+  h=from:to:cc:subject:date:message-id:in-reply-to:
+   references:mime-version:content-transfer-encoding;
+  bh=b0hAZciQJZLXXC8aetb8VC3iZTftmHhM+W5FL9Kyf4s=;
+  b=cqhKUenQgLwqrkOXoOG0kUNmM6g4nROpdAlBuBXuO6RaGyp+UCOSs9ZK
+   dz7kZ9qz167paPa8Th9SuGaYnwS/bGLRUdJ2rFDRuBWdg3cenqmVQHMCW
+   QMpo758IJRrAK4HJnO9lCXEpy5SlAHhH2RaXed/UMcDDumZbICDajeyAg
+   b57lLPyrPjFAMVtzhJidR3m34+YD11Seowjb4SWG9cuUQ0Wfv6AIUrfSO
+   fQDPV20t0pHpYnN+RVV5uw0ds0sivfbQZwfOd+yXoTtfvL6YA0q7kIXbm
+   i5ye0u/EJaMqXGQ8UmFwzz/LRQBURRxox9B7cwrCuq+AOiiXslHrHNn1g
+   g==;
+X-IronPort-AV: E=McAfee;i="6600,9927,10829"; a="376956500"
+X-IronPort-AV: E=Sophos;i="6.02,243,1688454000"; 
+   d="scan'208";a="376956500"
+Received: from orsmga005.jf.intel.com ([10.7.209.41])
+  by fmsmga104.fm.intel.com with ESMTP/TLS/ECDHE-RSA-AES256-GCM-SHA384; 11 Sep 2023 03:04:50 -0700
+X-ExtLoop1: 1
+X-IronPort-AV: E=McAfee;i="6600,9927,10829"; a="916964180"
+X-IronPort-AV: E=Sophos;i="6.02,243,1688454000"; 
+   d="scan'208";a="916964180"
+Received: from black.fi.intel.com ([10.237.72.28])
+  by orsmga005.jf.intel.com with ESMTP; 11 Sep 2023 03:04:47 -0700
+Received: by black.fi.intel.com (Postfix, from userid 1001)
+        id D4E94A22; Mon, 11 Sep 2023 13:04:45 +0300 (EEST)
+From:   Mika Westerberg <mika.westerberg@linux.intel.com>
+To:     linux-usb@vger.kernel.org
+Cc:     Yehezkel Bernat <YehezkelShB@gmail.com>,
+        Michael Jamet <michael.jamet@intel.com>,
+        Lukas Wunner <lukas@wunner.de>,
+        Andreas Noever <andreas.noever@gmail.com>,
+        Werner Sembach <wse@tuxedocomputers.com>,
+        Konrad J Hambrick <kjhambrick@gmail.com>,
+        Calvin Walton <calvin.walton@kepstin.ca>,
+        =?UTF-8?q?Marek=20=C5=A0anta?= <teslan223@gmail.com>,
+        David Binderman <dcb314@hotmail.com>,
+        Alex Balcanquall <alex@alexbal.com>,
+        Mika Westerberg <mika.westerberg@linux.intel.com>
+Subject: [PATCH 3/5] thunderbolt: Correct TMU mode initialization from hardware
+Date:   Mon, 11 Sep 2023 13:04:43 +0300
+Message-Id: <20230911100445.3612655-4-mika.westerberg@linux.intel.com>
+X-Mailer: git-send-email 2.40.1
+In-Reply-To: <20230911100445.3612655-1-mika.westerberg@linux.intel.com>
+References: <20230911100445.3612655-1-mika.westerberg@linux.intel.com>
+MIME-Version: 1.0
+Content-Transfer-Encoding: 8bit
+Precedence: bulk
+List-ID: <linux-usb.vger.kernel.org>
+X-Mailing-List: linux-usb@vger.kernel.org
+
+David reported that cppcheck found following possible copy & paste
+error from tmu_mode_init():
+
+  tmu.c:385:50: style: Expression is always false because 'else if' condition matches previous condition at line 383. [multiCondition]
+
+And indeed this is a bug. Fix it to use correct index
+(TB_SWITCH_TMU_MODE_HIFI_UNI).
+
+Reported-by: David Binderman <dcb314@hotmail.com>
+Fixes: d49b4f043d63 ("thunderbolt: Add support for enhanced uni-directional TMU mode")
+Cc: stable@vger.kernel.org
+Signed-off-by: Mika Westerberg <mika.westerberg@linux.intel.com>
+---
+ drivers/thunderbolt/tmu.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/drivers/thunderbolt/tmu.c b/drivers/thunderbolt/tmu.c
+index 747f88703d5c..11f2aec2a5d3 100644
+--- a/drivers/thunderbolt/tmu.c
++++ b/drivers/thunderbolt/tmu.c
+@@ -382,7 +382,7 @@ static int tmu_mode_init(struct tb_switch *sw)
+ 		} else if (ucap && tb_port_tmu_is_unidirectional(up)) {
+ 			if (tmu_rates[TB_SWITCH_TMU_MODE_LOWRES] == rate)
+ 				sw->tmu.mode = TB_SWITCH_TMU_MODE_LOWRES;
+-			else if (tmu_rates[TB_SWITCH_TMU_MODE_LOWRES] == rate)
++			else if (tmu_rates[TB_SWITCH_TMU_MODE_HIFI_UNI] == rate)
+ 				sw->tmu.mode = TB_SWITCH_TMU_MODE_HIFI_UNI;
+ 		} else if (rate) {
+ 			sw->tmu.mode = TB_SWITCH_TMU_MODE_HIFI_BI;
+-- 
+2.40.1
+
+
+From mboxrd@z Thu Jan  1 00:00:00 1970
+Return-Path: <linux-usb-owner@vger.kernel.org>
+X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
+	aws-us-west-2-korg-lkml-1.web.codeaurora.org
+Received: from vger.kernel.org (vger.kernel.org [23.128.96.18])
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 161FFCA0EC3
+	for <linux-usb@archiver.kernel.org>; Mon, 11 Sep 2023 21:41:13 +0000 (UTC)
+Received: (majordomo@vger.kernel.org) by vger.kernel.org via listexpand
+        id S1350524AbjIKVi5 (ORCPT <rfc822;linux-usb@archiver.kernel.org>);
+        Mon, 11 Sep 2023 17:38:57 -0400
+Received: from lindbergh.monkeyblade.net ([23.128.96.19]:39626 "EHLO
+        lindbergh.monkeyblade.net" rhost-flags-OK-OK-OK-OK) by vger.kernel.org
+        with ESMTP id S236267AbjIKKE7 (ORCPT
+        <rfc822;linux-usb@vger.kernel.org>); Mon, 11 Sep 2023 06:04:59 -0400
+Received: from mgamail.intel.com (mgamail.intel.com [192.55.52.120])
+        by lindbergh.monkeyblade.net (Postfix) with ESMTPS id DC04DE68
+        for <linux-usb@vger.kernel.org>; Mon, 11 Sep 2023 03:04:54 -0700 (PDT)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple;
+  d=intel.com; i=@intel.com; q=dns/txt; s=Intel;
+  t=1694426694; x=1725962694;
+  h=from:to:cc:subject:date:message-id:in-reply-to:
+   references:mime-version:content-transfer-encoding;
+  bh=olqd5D6SDR+8ZXuR/27r/+Aj51VW9eFTcGWbtc9x7sw=;
+  b=afKllJ9Z4tLXkGc4O5uiBZwP7M5aXsavs8pAmYvibsutSBlMLODUe0vJ
+   Fw7N3RVFyorVu52FSy8W6ZNYxy60/5sO4hZ7kWbLy3E5By5jpp8R2jH6r
+   Gn18WKJAWwUMVNNVWdYVCYckdyoULd/jOJTGOkNRSMSpkTMNmBOKMJDIs
+   peAAdS2JJ0VwbleLHxfiP0YJs8QDlEszgpn5W/oEpniHM+0A0V29zdLdT
+   CB+QeKXEQvQg4dpgBZ97woiA8xZL3ojRIi5MW0gfmLqOI1AKskN4VNcck
+   aCAQrpyDphi04LmPeH72P4sAqihyuUxjnrzlS71ZjuhEJubllf9GMdeWu
+   w==;
+X-IronPort-AV: E=McAfee;i="6600,9927,10829"; a="376956532"
+X-IronPort-AV: E=Sophos;i="6.02,243,1688454000"; 
+   d="scan'208";a="376956532"
+Received: from orsmga005.jf.intel.com ([10.7.209.41])
+  by fmsmga104.fm.intel.com with ESMTP/TLS/ECDHE-RSA-AES256-GCM-SHA384; 11 Sep 2023 03:04:54 -0700
+X-ExtLoop1: 1
+X-IronPort-AV: E=McAfee;i="6600,9927,10829"; a="916964203"
+X-IronPort-AV: E=Sophos;i="6.02,243,1688454000"; 
+   d="scan'208";a="916964203"
+Received: from black.fi.intel.com ([10.237.72.28])
+  by orsmga005.jf.intel.com with ESMTP; 11 Sep 2023 03:04:51 -0700
+Received: by black.fi.intel.com (Postfix, from userid 1001)
+        id EE7DDB84; Mon, 11 Sep 2023 13:04:45 +0300 (EEST)
+From:   Mika Westerberg <mika.westerberg@linux.intel.com>
+To:     linux-usb@vger.kernel.org
+Cc:     Yehezkel Bernat <YehezkelShB@gmail.com>,
+        Michael Jamet <michael.jamet@intel.com>,
+        Lukas Wunner <lukas@wunner.de>,
+        Andreas Noever <andreas.noever@gmail.com>,
+        Werner Sembach <wse@tuxedocomputers.com>,
+        Konrad J Hambrick <kjhambrick@gmail.com>,
+        Calvin Walton <calvin.walton@kepstin.ca>,
+        =?UTF-8?q?Marek=20=C5=A0anta?= <teslan223@gmail.com>,
+        David Binderman <dcb314@hotmail.com>,
+        Alex Balcanquall <alex@alexbal.com>,
+        Mika Westerberg <mika.westerberg@linux.intel.com>
+Subject: [PATCH 5/5] thunderbolt: Restart XDomain discovery handshake after failure
+Date:   Mon, 11 Sep 2023 13:04:45 +0300
+Message-Id: <20230911100445.3612655-6-mika.westerberg@linux.intel.com>
+X-Mailer: git-send-email 2.40.1
+In-Reply-To: <20230911100445.3612655-1-mika.westerberg@linux.intel.com>
+References: <20230911100445.3612655-1-mika.westerberg@linux.intel.com>
+MIME-Version: 1.0
+Content-Transfer-Encoding: 8bit
+Precedence: bulk
+List-ID: <linux-usb.vger.kernel.org>
+X-Mailing-List: linux-usb@vger.kernel.org
+
+Alex reported that after rebooting the other host the peer-to-peer link
+does not come up anymore. The reason for this is that the host that was
+not rebooted tries to send the UUID request only 10 times according to
+the USB4 Inter-Domain spec and gives up if it does not get reply. Then
+when the other side is actually ready it cannot get the link established
+anymore. The USB4 Inter-Domain spec requires that the discovery protocol
+is restarted in that case so implement this now.
+
+Reported-by: Alex Balcanquall <alex@alexbal.com>
+Signed-off-by: Mika Westerberg <mika.westerberg@linux.intel.com>
+---
+ drivers/thunderbolt/xdomain.c | 58 +++++++++++++++++++++++++----------
+ 1 file changed, 41 insertions(+), 17 deletions(-)
+
+diff --git a/drivers/thunderbolt/xdomain.c b/drivers/thunderbolt/xdomain.c
+index 5b5566862318..9803f0bbf20d 100644
+--- a/drivers/thunderbolt/xdomain.c
++++ b/drivers/thunderbolt/xdomain.c
+@@ -703,6 +703,27 @@ static void update_property_block(struct tb_xdomain *xd)
+ 	mutex_unlock(&xdomain_lock);
+ }
+ 
++static void start_handshake(struct tb_xdomain *xd)
++{
++	xd->state = XDOMAIN_STATE_INIT;
++	queue_delayed_work(xd->tb->wq, &xd->state_work,
++			   msecs_to_jiffies(XDOMAIN_SHORT_TIMEOUT));
++}
++
++/* Can be called from state_work */
++static void __stop_handshake(struct tb_xdomain *xd)
++{
++	cancel_delayed_work_sync(&xd->properties_changed_work);
++	xd->properties_changed_retries = 0;
++	xd->state_retries = 0;
++}
++
++static void stop_handshake(struct tb_xdomain *xd)
++{
++	cancel_delayed_work_sync(&xd->state_work);
++	__stop_handshake(xd);
++}
++
+ static void tb_xdp_handle_request(struct work_struct *work)
+ {
+ 	struct xdomain_request_work *xw = container_of(work, typeof(*xw), work);
+@@ -765,6 +786,15 @@ static void tb_xdp_handle_request(struct work_struct *work)
+ 	case UUID_REQUEST:
+ 		tb_dbg(tb, "%llx: received XDomain UUID request\n", route);
+ 		ret = tb_xdp_uuid_response(ctl, route, sequence, uuid);
++		/*
++		 * If we've stopped the discovery with an error such as
++		 * timing out, we will restart the handshake now that we
++		 * received UUID request from the remote host.
++		 */
++		if (!ret && xd && xd->state == XDOMAIN_STATE_ERROR) {
++			dev_dbg(&xd->dev, "restarting handshake\n");
++			start_handshake(xd);
++		}
+ 		break;
+ 
+ 	case LINK_STATE_STATUS_REQUEST:
+@@ -1521,6 +1551,13 @@ static void tb_xdomain_queue_properties_changed(struct tb_xdomain *xd)
+ 			   msecs_to_jiffies(XDOMAIN_SHORT_TIMEOUT));
+ }
+ 
++static void tb_xdomain_failed(struct tb_xdomain *xd)
++{
++	xd->state = XDOMAIN_STATE_ERROR;
++	queue_delayed_work(xd->tb->wq, &xd->state_work,
++			   msecs_to_jiffies(XDOMAIN_DEFAULT_TIMEOUT));
++}
++
+ static void tb_xdomain_state_work(struct work_struct *work)
+ {
+ 	struct tb_xdomain *xd = container_of(work, typeof(*xd), state_work.work);
+@@ -1547,7 +1584,7 @@ static void tb_xdomain_state_work(struct work_struct *work)
+ 		if (ret) {
+ 			if (ret == -EAGAIN)
+ 				goto retry_state;
+-			xd->state = XDOMAIN_STATE_ERROR;
++			tb_xdomain_failed(xd);
+ 		} else {
+ 			tb_xdomain_queue_properties_changed(xd);
+ 			if (xd->bonding_possible)
+@@ -1612,7 +1649,7 @@ static void tb_xdomain_state_work(struct work_struct *work)
+ 		if (ret) {
+ 			if (ret == -EAGAIN)
+ 				goto retry_state;
+-			xd->state = XDOMAIN_STATE_ERROR;
++			tb_xdomain_failed(xd);
+ 		} else {
+ 			xd->state = XDOMAIN_STATE_ENUMERATED;
+ 		}
+@@ -1623,6 +1660,8 @@ static void tb_xdomain_state_work(struct work_struct *work)
+ 		break;
+ 
+ 	case XDOMAIN_STATE_ERROR:
++		dev_dbg(&xd->dev, "discovery failed, stopping handshake\n");
++		__stop_handshake(xd);
+ 		break;
+ 
+ 	default:
+@@ -1833,21 +1872,6 @@ static void tb_xdomain_release(struct device *dev)
+ 	kfree(xd);
+ }
+ 
+-static void start_handshake(struct tb_xdomain *xd)
+-{
+-	xd->state = XDOMAIN_STATE_INIT;
+-	queue_delayed_work(xd->tb->wq, &xd->state_work,
+-			   msecs_to_jiffies(XDOMAIN_SHORT_TIMEOUT));
+-}
+-
+-static void stop_handshake(struct tb_xdomain *xd)
+-{
+-	cancel_delayed_work_sync(&xd->properties_changed_work);
+-	cancel_delayed_work_sync(&xd->state_work);
+-	xd->properties_changed_retries = 0;
+-	xd->state_retries = 0;
+-}
+-
+ static int __maybe_unused tb_xdomain_suspend(struct device *dev)
+ {
+ 	stop_handshake(tb_to_xdomain(dev));
+-- 
+2.40.1
+
+
+From mboxrd@z Thu Jan  1 00:00:00 1970
+Return-Path: <linux-usb-owner@vger.kernel.org>
+X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
+	aws-us-west-2-korg-lkml-1.web.codeaurora.org
+Received: from vger.kernel.org (vger.kernel.org [23.128.96.18])
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 9E01ACA0ECD
+	for <linux-usb@archiver.kernel.org>; Mon, 11 Sep 2023 21:41:25 +0000 (UTC)
+Received: (majordomo@vger.kernel.org) by vger.kernel.org via listexpand
+        id S240108AbjIKVj3 (ORCPT <rfc822;linux-usb@archiver.kernel.org>);
+        Mon, 11 Sep 2023 17:39:29 -0400
+Received: from lindbergh.monkeyblade.net ([23.128.96.19]:39594 "EHLO
+        lindbergh.monkeyblade.net" rhost-flags-OK-OK-OK-OK) by vger.kernel.org
+        with ESMTP id S236255AbjIKKE5 (ORCPT
+        <rfc822;linux-usb@vger.kernel.org>); Mon, 11 Sep 2023 06:04:57 -0400
+Received: from mgamail.intel.com (mgamail.intel.com [134.134.136.31])
+        by lindbergh.monkeyblade.net (Postfix) with ESMTPS id A52E1E69
+        for <linux-usb@vger.kernel.org>; Mon, 11 Sep 2023 03:04:51 -0700 (PDT)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple;
+  d=intel.com; i=@intel.com; q=dns/txt; s=Intel;
+  t=1694426691; x=1725962691;
+  h=from:to:cc:subject:date:message-id:in-reply-to:
+   references:mime-version:content-transfer-encoding;
+  bh=4pjfi5MxWXlTNHcTaKun5GOmbkqddnHY3t8pWX99838=;
+  b=XCFzjG/fG5H3Z99aIdMuWkxGRO9PhBRaP0A2fhMg5bIFaHyYblzG3Cm5
+   kku7wzvxGwsUZXSRs4Ymo02lKIAp08E+uo/FuYYdTdjVJmNY0iKRMu70D
+   GjSvPN7m6vPv59p/lZu13cdeesp7g2MyoAAbCjJeuCNVepEQXuSA2eeWV
+   umL5894n/QfgQHLyZZvo9mNiyE0IHqbpkDddTnLZ/qUc8JhudVXLDi2sF
+   5n6/nVzwmC8wyFV1+Vy4KnR4cOjgUdHfH/JJH5frFCRcfuJQz+8ou5Gte
+   ECn3GHRydeL60yhopHjK9lgwUsnKSRXgw/oNoSibFoBE7GXhq9+qL/tht
+   A==;
+X-IronPort-AV: E=McAfee;i="6600,9927,10829"; a="442037115"
+X-IronPort-AV: E=Sophos;i="6.02,243,1688454000"; 
+   d="scan'208";a="442037115"
+Received: from fmsmga002.fm.intel.com ([10.253.24.26])
+  by orsmga104.jf.intel.com with ESMTP/TLS/ECDHE-RSA-AES256-GCM-SHA384; 11 Sep 2023 03:04:50 -0700
+X-ExtLoop1: 1
+X-IronPort-AV: E=McAfee;i="6600,9927,10829"; a="858263759"
+X-IronPort-AV: E=Sophos;i="6.02,243,1688454000"; 
+   d="scan'208";a="858263759"
+Received: from black.fi.intel.com ([10.237.72.28])
+  by fmsmga002.fm.intel.com with ESMTP; 11 Sep 2023 03:04:47 -0700
+Received: by black.fi.intel.com (Postfix, from userid 1001)
+        id B75E86A6; Mon, 11 Sep 2023 13:04:45 +0300 (EEST)
+From:   Mika Westerberg <mika.westerberg@linux.intel.com>
+To:     linux-usb@vger.kernel.org
+Cc:     Yehezkel Bernat <YehezkelShB@gmail.com>,
+        Michael Jamet <michael.jamet@intel.com>,
+        Lukas Wunner <lukas@wunner.de>,
+        Andreas Noever <andreas.noever@gmail.com>,
+        Werner Sembach <wse@tuxedocomputers.com>,
+        Konrad J Hambrick <kjhambrick@gmail.com>,
+        Calvin Walton <calvin.walton@kepstin.ca>,
+        =?UTF-8?q?Marek=20=C5=A0anta?= <teslan223@gmail.com>,
+        David Binderman <dcb314@hotmail.com>,
+        Alex Balcanquall <alex@alexbal.com>,
+        Mika Westerberg <mika.westerberg@linux.intel.com>
+Subject: [PATCH 1/5] thunderbolt: Workaround an IOMMU fault on certain systems with Intel Maple Ridge
+Date:   Mon, 11 Sep 2023 13:04:41 +0300
+Message-Id: <20230911100445.3612655-2-mika.westerberg@linux.intel.com>
+X-Mailer: git-send-email 2.40.1
+In-Reply-To: <20230911100445.3612655-1-mika.westerberg@linux.intel.com>
+References: <20230911100445.3612655-1-mika.westerberg@linux.intel.com>
+MIME-Version: 1.0
+Content-Transfer-Encoding: 8bit
+Precedence: bulk
+List-ID: <linux-usb.vger.kernel.org>
+X-Mailing-List: linux-usb@vger.kernel.org
+
+On some systems the IOMMU blocks the first couple of driver ready
+messages to the connection manager firmware as can be seen in below
+excerpts:
+
+  thunderbolt 0000:06:00.0: AMD-Vi: Event logged [IO_PAGE_FAULT domain=0x0010 address=0xbb0e3400 flags=0x0020]
+
+or
+
+  DMAR: DRHD: handling fault status reg 2
+  DMAR: [DMA Write] Request device [04:00.0] PASID ffffffff fault addr 69974000 [fault reason 05] PTE Write access is not set
+
+The reason is unknown and hard to debug because we were not able to
+reproduce this locally. This only happens on certain systems with Intel
+Maple Ridge Thunderbolt controller. If there is a device connected when
+the driver is loaded the issue does not happen either. Only when there
+is nothing connected (so typically when the system is booted up).
+
+We can work this around by sending the driver ready several times. After
+a couple of retries the message goes through and the controller works
+just fine. For this reason make the number of retries a parameter for
+icm_request() and then for Maple Ridge (and Titan Ridge as they us the
+same function but this should not matter) increase number of retries
+while shortening the timeout accordingly.
+
+Reported-by: Werner Sembach <wse@tuxedocomputers.com>
+Reported-by: Konrad J Hambrick <kjhambrick@gmail.com>
+Reported-by: Calvin Walton <calvin.walton@kepstin.ca>
+Closes: https://bugzilla.kernel.org/show_bug.cgi?id=214259
+Cc: stable@vger.kernel.org
+Signed-off-by: Mika Westerberg <mika.westerberg@linux.intel.com>
+---
+ drivers/thunderbolt/icm.c | 40 +++++++++++++++++++--------------------
+ 1 file changed, 20 insertions(+), 20 deletions(-)
+
+diff --git a/drivers/thunderbolt/icm.c b/drivers/thunderbolt/icm.c
+index dbdcad8d73bf..d8b9c734abd3 100644
+--- a/drivers/thunderbolt/icm.c
++++ b/drivers/thunderbolt/icm.c
+@@ -41,6 +41,7 @@
+ #define PHY_PORT_CS1_LINK_STATE_SHIFT	26
+ 
+ #define ICM_TIMEOUT			5000	/* ms */
++#define ICM_RETRIES			3
+ #define ICM_APPROVE_TIMEOUT		10000	/* ms */
+ #define ICM_MAX_LINK			4
+ 
+@@ -296,10 +297,9 @@ static bool icm_copy(struct tb_cfg_request *req, const struct ctl_pkg *pkg)
+ 
+ static int icm_request(struct tb *tb, const void *request, size_t request_size,
+ 		       void *response, size_t response_size, size_t npackets,
+-		       unsigned int timeout_msec)
++		       int retries, unsigned int timeout_msec)
+ {
+ 	struct icm *icm = tb_priv(tb);
+-	int retries = 3;
+ 
+ 	do {
+ 		struct tb_cfg_request *req;
+@@ -410,7 +410,7 @@ static int icm_fr_get_route(struct tb *tb, u8 link, u8 depth, u64 *route)
+ 		return -ENOMEM;
+ 
+ 	ret = icm_request(tb, &request, sizeof(request), switches,
+-			  sizeof(*switches), npackets, ICM_TIMEOUT);
++			  sizeof(*switches), npackets, ICM_RETRIES, ICM_TIMEOUT);
+ 	if (ret)
+ 		goto err_free;
+ 
+@@ -463,7 +463,7 @@ icm_fr_driver_ready(struct tb *tb, enum tb_security_level *security_level,
+ 
+ 	memset(&reply, 0, sizeof(reply));
+ 	ret = icm_request(tb, &request, sizeof(request), &reply, sizeof(reply),
+-			  1, ICM_TIMEOUT);
++			  1, ICM_RETRIES, ICM_TIMEOUT);
+ 	if (ret)
+ 		return ret;
+ 
+@@ -488,7 +488,7 @@ static int icm_fr_approve_switch(struct tb *tb, struct tb_switch *sw)
+ 	memset(&reply, 0, sizeof(reply));
+ 	/* Use larger timeout as establishing tunnels can take some time */
+ 	ret = icm_request(tb, &request, sizeof(request), &reply, sizeof(reply),
+-			  1, ICM_APPROVE_TIMEOUT);
++			  1, ICM_RETRIES, ICM_APPROVE_TIMEOUT);
+ 	if (ret)
+ 		return ret;
+ 
+@@ -515,7 +515,7 @@ static int icm_fr_add_switch_key(struct tb *tb, struct tb_switch *sw)
+ 
+ 	memset(&reply, 0, sizeof(reply));
+ 	ret = icm_request(tb, &request, sizeof(request), &reply, sizeof(reply),
+-			  1, ICM_TIMEOUT);
++			  1, ICM_RETRIES, ICM_TIMEOUT);
+ 	if (ret)
+ 		return ret;
+ 
+@@ -543,7 +543,7 @@ static int icm_fr_challenge_switch_key(struct tb *tb, struct tb_switch *sw,
+ 
+ 	memset(&reply, 0, sizeof(reply));
+ 	ret = icm_request(tb, &request, sizeof(request), &reply, sizeof(reply),
+-			  1, ICM_TIMEOUT);
++			  1, ICM_RETRIES, ICM_TIMEOUT);
+ 	if (ret)
+ 		return ret;
+ 
+@@ -577,7 +577,7 @@ static int icm_fr_approve_xdomain_paths(struct tb *tb, struct tb_xdomain *xd,
+ 
+ 	memset(&reply, 0, sizeof(reply));
+ 	ret = icm_request(tb, &request, sizeof(request), &reply, sizeof(reply),
+-			  1, ICM_TIMEOUT);
++			  1, ICM_RETRIES, ICM_TIMEOUT);
+ 	if (ret)
+ 		return ret;
+ 
+@@ -1020,7 +1020,7 @@ icm_tr_driver_ready(struct tb *tb, enum tb_security_level *security_level,
+ 
+ 	memset(&reply, 0, sizeof(reply));
+ 	ret = icm_request(tb, &request, sizeof(request), &reply, sizeof(reply),
+-			  1, 20000);
++			  1, 10, 2000);
+ 	if (ret)
+ 		return ret;
+ 
+@@ -1053,7 +1053,7 @@ static int icm_tr_approve_switch(struct tb *tb, struct tb_switch *sw)
+ 
+ 	memset(&reply, 0, sizeof(reply));
+ 	ret = icm_request(tb, &request, sizeof(request), &reply, sizeof(reply),
+-			  1, ICM_APPROVE_TIMEOUT);
++			  1, ICM_RETRIES, ICM_APPROVE_TIMEOUT);
+ 	if (ret)
+ 		return ret;
+ 
+@@ -1081,7 +1081,7 @@ static int icm_tr_add_switch_key(struct tb *tb, struct tb_switch *sw)
+ 
+ 	memset(&reply, 0, sizeof(reply));
+ 	ret = icm_request(tb, &request, sizeof(request), &reply, sizeof(reply),
+-			  1, ICM_TIMEOUT);
++			  1, ICM_RETRIES, ICM_TIMEOUT);
+ 	if (ret)
+ 		return ret;
+ 
+@@ -1110,7 +1110,7 @@ static int icm_tr_challenge_switch_key(struct tb *tb, struct tb_switch *sw,
+ 
+ 	memset(&reply, 0, sizeof(reply));
+ 	ret = icm_request(tb, &request, sizeof(request), &reply, sizeof(reply),
+-			  1, ICM_TIMEOUT);
++			  1, ICM_RETRIES, ICM_TIMEOUT);
+ 	if (ret)
+ 		return ret;
+ 
+@@ -1144,7 +1144,7 @@ static int icm_tr_approve_xdomain_paths(struct tb *tb, struct tb_xdomain *xd,
+ 
+ 	memset(&reply, 0, sizeof(reply));
+ 	ret = icm_request(tb, &request, sizeof(request), &reply, sizeof(reply),
+-			  1, ICM_TIMEOUT);
++			  1, ICM_RETRIES, ICM_TIMEOUT);
+ 	if (ret)
+ 		return ret;
+ 
+@@ -1170,7 +1170,7 @@ static int icm_tr_xdomain_tear_down(struct tb *tb, struct tb_xdomain *xd,
+ 
+ 	memset(&reply, 0, sizeof(reply));
+ 	ret = icm_request(tb, &request, sizeof(request), &reply, sizeof(reply),
+-			  1, ICM_TIMEOUT);
++			  1, ICM_RETRIES, ICM_TIMEOUT);
+ 	if (ret)
+ 		return ret;
+ 
+@@ -1496,7 +1496,7 @@ icm_ar_driver_ready(struct tb *tb, enum tb_security_level *security_level,
+ 
+ 	memset(&reply, 0, sizeof(reply));
+ 	ret = icm_request(tb, &request, sizeof(request), &reply, sizeof(reply),
+-			  1, ICM_TIMEOUT);
++			  1, ICM_RETRIES, ICM_TIMEOUT);
+ 	if (ret)
+ 		return ret;
+ 
+@@ -1522,7 +1522,7 @@ static int icm_ar_get_route(struct tb *tb, u8 link, u8 depth, u64 *route)
+ 
+ 	memset(&reply, 0, sizeof(reply));
+ 	ret = icm_request(tb, &request, sizeof(request), &reply, sizeof(reply),
+-			  1, ICM_TIMEOUT);
++			  1, ICM_RETRIES, ICM_TIMEOUT);
+ 	if (ret)
+ 		return ret;
+ 
+@@ -1543,7 +1543,7 @@ static int icm_ar_get_boot_acl(struct tb *tb, uuid_t *uuids, size_t nuuids)
+ 
+ 	memset(&reply, 0, sizeof(reply));
+ 	ret = icm_request(tb, &request, sizeof(request), &reply, sizeof(reply),
+-			  1, ICM_TIMEOUT);
++			  1, ICM_RETRIES, ICM_TIMEOUT);
+ 	if (ret)
+ 		return ret;
+ 
+@@ -1604,7 +1604,7 @@ static int icm_ar_set_boot_acl(struct tb *tb, const uuid_t *uuids,
+ 
+ 	memset(&reply, 0, sizeof(reply));
+ 	ret = icm_request(tb, &request, sizeof(request), &reply, sizeof(reply),
+-			  1, ICM_TIMEOUT);
++			  1, ICM_RETRIES, ICM_TIMEOUT);
+ 	if (ret)
+ 		return ret;
+ 
+@@ -1626,7 +1626,7 @@ icm_icl_driver_ready(struct tb *tb, enum tb_security_level *security_level,
+ 
+ 	memset(&reply, 0, sizeof(reply));
+ 	ret = icm_request(tb, &request, sizeof(request), &reply, sizeof(reply),
+-			  1, 20000);
++			  1, ICM_RETRIES, 20000);
+ 	if (ret)
+ 		return ret;
+ 
+@@ -2298,7 +2298,7 @@ static int icm_usb4_switch_op(struct tb_switch *sw, u16 opcode, u32 *metadata,
+ 
+ 	memset(&reply, 0, sizeof(reply));
+ 	ret = icm_request(tb, &request, sizeof(request), &reply, sizeof(reply),
+-			  1, ICM_TIMEOUT);
++			  1, ICM_RETRIES, ICM_TIMEOUT);
+ 	if (ret)
+ 		return ret;
+ 
+-- 
+2.40.1
+
+
+From mboxrd@z Thu Jan  1 00:00:00 1970
+Return-Path: <linux-usb-owner@vger.kernel.org>
+X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
+	aws-us-west-2-korg-lkml-1.web.codeaurora.org
+Received: from vger.kernel.org (vger.kernel.org [23.128.96.18])
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 97738CA0ED5
+	for <linux-usb@archiver.kernel.org>; Mon, 11 Sep 2023 21:41:43 +0000 (UTC)
+Received: (majordomo@vger.kernel.org) by vger.kernel.org via listexpand
+        id S1350646AbjIKVkM (ORCPT <rfc822;linux-usb@archiver.kernel.org>);
+        Mon, 11 Sep 2023 17:40:12 -0400
+Received: from lindbergh.monkeyblade.net ([23.128.96.19]:39598 "EHLO
+        lindbergh.monkeyblade.net" rhost-flags-OK-OK-OK-OK) by vger.kernel.org
+        with ESMTP id S236257AbjIKKE5 (ORCPT
+        <rfc822;linux-usb@vger.kernel.org>); Mon, 11 Sep 2023 06:04:57 -0400
+Received: from mgamail.intel.com (mgamail.intel.com [134.134.136.31])
+        by lindbergh.monkeyblade.net (Postfix) with ESMTPS id 234BAE6B
+        for <linux-usb@vger.kernel.org>; Mon, 11 Sep 2023 03:04:53 -0700 (PDT)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple;
+  d=intel.com; i=@intel.com; q=dns/txt; s=Intel;
+  t=1694426693; x=1725962693;
+  h=from:to:cc:subject:date:message-id:in-reply-to:
+   references:mime-version:content-transfer-encoding;
+  bh=XOEjvAXR5k8yZUwMcF3JSZB0woDgGcIsExvIMG5XRuc=;
+  b=mm4Ns5sbJj4KyDat7FOqniolrOXYNGiGCyJVa0NlJcPnX9fSOM4qeXCP
+   ARGyG+q5JI9VBE9ZLiGGIQR3WPo85n3qAVmzFjvrvmvjSFfe+FdG1udBJ
+   B7KFv87CxQwLl0EYu8sZKsuD4XBHXCIXv9Fp2eUhW9shf55tAjHRaUXJC
+   /K8xvqPVZeepB6RX93VwV1TcWw2ZK+jtN/4D4itz+U4zZ1kzQ3TfJO/pQ
+   Q21p/ihvzv6EtdO/xXEw07xiyHgigrQsg7SMir5ZdVITvQwx37go8y5la
+   RazAA8yppo5pyuSHUTOUyxXTEcozZat8jZvnJqasZroZQsa2fAoWPDIT1
+   w==;
+X-IronPort-AV: E=McAfee;i="6600,9927,10829"; a="442037104"
+X-IronPort-AV: E=Sophos;i="6.02,243,1688454000"; 
+   d="scan'208";a="442037104"
+Received: from fmsmga002.fm.intel.com ([10.253.24.26])
+  by orsmga104.jf.intel.com with ESMTP/TLS/ECDHE-RSA-AES256-GCM-SHA384; 11 Sep 2023 03:04:50 -0700
+X-ExtLoop1: 1
+X-IronPort-AV: E=McAfee;i="6600,9927,10829"; a="858263757"
+X-IronPort-AV: E=Sophos;i="6.02,243,1688454000"; 
+   d="scan'208";a="858263757"
+Received: from black.fi.intel.com ([10.237.72.28])
+  by fmsmga002.fm.intel.com with ESMTP; 11 Sep 2023 03:04:47 -0700
+Received: by black.fi.intel.com (Postfix, from userid 1001)
+        id DFEE8B50; Mon, 11 Sep 2023 13:04:45 +0300 (EEST)
+From:   Mika Westerberg <mika.westerberg@linux.intel.com>
+To:     linux-usb@vger.kernel.org
+Cc:     Yehezkel Bernat <YehezkelShB@gmail.com>,
+        Michael Jamet <michael.jamet@intel.com>,
+        Lukas Wunner <lukas@wunner.de>,
+        Andreas Noever <andreas.noever@gmail.com>,
+        Werner Sembach <wse@tuxedocomputers.com>,
+        Konrad J Hambrick <kjhambrick@gmail.com>,
+        Calvin Walton <calvin.walton@kepstin.ca>,
+        =?UTF-8?q?Marek=20=C5=A0anta?= <teslan223@gmail.com>,
+        David Binderman <dcb314@hotmail.com>,
+        Alex Balcanquall <alex@alexbal.com>,
+        Mika Westerberg <mika.westerberg@linux.intel.com>
+Subject: [PATCH 4/5] thunderbolt: Apply USB 3.x bandwidth quirk only in software connection manager
+Date:   Mon, 11 Sep 2023 13:04:44 +0300
+Message-Id: <20230911100445.3612655-5-mika.westerberg@linux.intel.com>
+X-Mailer: git-send-email 2.40.1
+In-Reply-To: <20230911100445.3612655-1-mika.westerberg@linux.intel.com>
+References: <20230911100445.3612655-1-mika.westerberg@linux.intel.com>
+MIME-Version: 1.0
+Content-Transfer-Encoding: 8bit
+Precedence: bulk
+List-ID: <linux-usb.vger.kernel.org>
+X-Mailing-List: linux-usb@vger.kernel.org
+
+This is not needed when firmware connection manager is run so limit this
+to software connection manager.
+
+Signed-off-by: Mika Westerberg <mika.westerberg@linux.intel.com>
+---
+ drivers/thunderbolt/quirks.c | 3 +++
+ 1 file changed, 3 insertions(+)
+
+diff --git a/drivers/thunderbolt/quirks.c b/drivers/thunderbolt/quirks.c
+index 488138a28ae1..e6bfa63b40ae 100644
+--- a/drivers/thunderbolt/quirks.c
++++ b/drivers/thunderbolt/quirks.c
+@@ -31,6 +31,9 @@ static void quirk_usb3_maximum_bandwidth(struct tb_switch *sw)
+ {
+ 	struct tb_port *port;
+ 
++	if (tb_switch_is_icm(sw))
++		return;
++
+ 	tb_switch_for_each_port(sw, port) {
+ 		if (!tb_port_is_usb3_down(port))
+ 			continue;
+-- 
+2.40.1
+
+
+From mboxrd@z Thu Jan  1 00:00:00 1970
+Return-Path: <linux-usb-owner@vger.kernel.org>
+X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
+	aws-us-west-2-korg-lkml-1.web.codeaurora.org
+Received: from vger.kernel.org (vger.kernel.org [23.128.96.18])
+	by smtp.lore.kernel.org (Postfix) with ESMTP id AD45FCA0ED3
+	for <linux-usb@archiver.kernel.org>; Mon, 11 Sep 2023 21:48:04 +0000 (UTC)
+Received: (majordomo@vger.kernel.org) by vger.kernel.org via listexpand
+        id S1350832AbjIKVll (ORCPT <rfc822;linux-usb@archiver.kernel.org>);
+        Mon, 11 Sep 2023 17:41:41 -0400
+Received: from lindbergh.monkeyblade.net ([23.128.96.19]:39610 "EHLO
+        lindbergh.monkeyblade.net" rhost-flags-OK-OK-OK-OK) by vger.kernel.org
+        with ESMTP id S236264AbjIKKE5 (ORCPT
+        <rfc822;linux-usb@vger.kernel.org>); Mon, 11 Sep 2023 06:04:57 -0400
+Received: from mgamail.intel.com (mgamail.intel.com [134.134.136.31])
+        by lindbergh.monkeyblade.net (Postfix) with ESMTPS id 8B050E6C
+        for <linux-usb@vger.kernel.org>; Mon, 11 Sep 2023 03:04:53 -0700 (PDT)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple;
+  d=intel.com; i=@intel.com; q=dns/txt; s=Intel;
+  t=1694426693; x=1725962693;
+  h=from:to:cc:subject:date:message-id:mime-version:
+   content-transfer-encoding;
+  bh=favUYh5YkCTfirv9jmPMIlJmw8GqaPLjfKiwPb8aFvA=;
+  b=axnGjplOHMQUyUMIB4cbLZmE132c2GLJPqlSb8QGm6T3J1kE1l2+04qB
+   2U3RbOFadUuLKxndTvkNUNVDMz6xHwmhWVOnfcCSksv1lCXm3tv9yDhtF
+   AamG2FDkBd8GKNutbFAaT92QObKJ2N4NBoWaI0iJKr69Q5euwxAzWyFBE
+   5dyICAhKwLCQRAk44vdAt1eq15jpoUl5XJDxbuFUPTyJz9m9LDPkF4eGg
+   BA45BzIXry6FhjSrGEJ+AusdGKphTIQmZCOLt9d4Pf6RzjCYmgpHCJXiS
+   5JeQWzrlhoqvZRvgvfwqExvcx77qYkyIlbgEIQ5j544goKxkZz5oc+Bw0
+   w==;
+X-IronPort-AV: E=McAfee;i="6600,9927,10829"; a="442037125"
+X-IronPort-AV: E=Sophos;i="6.02,243,1688454000"; 
+   d="scan'208";a="442037125"
+Received: from fmsmga002.fm.intel.com ([10.253.24.26])
+  by orsmga104.jf.intel.com with ESMTP/TLS/ECDHE-RSA-AES256-GCM-SHA384; 11 Sep 2023 03:04:51 -0700
+X-ExtLoop1: 1
+X-IronPort-AV: E=McAfee;i="6600,9927,10829"; a="858263762"
+X-IronPort-AV: E=Sophos;i="6.02,243,1688454000"; 
+   d="scan'208";a="858263762"
+Received: from black.fi.intel.com ([10.237.72.28])
+  by fmsmga002.fm.intel.com with ESMTP; 11 Sep 2023 03:04:47 -0700
+Received: by black.fi.intel.com (Postfix, from userid 1001)
+        id A6CE4988; Mon, 11 Sep 2023 13:04:45 +0300 (EEST)
+From:   Mika Westerberg <mika.westerberg@linux.intel.com>
+To:     linux-usb@vger.kernel.org
+Cc:     Yehezkel Bernat <YehezkelShB@gmail.com>,
+        Michael Jamet <michael.jamet@intel.com>,
+        Lukas Wunner <lukas@wunner.de>,
+        Andreas Noever <andreas.noever@gmail.com>,
+        Werner Sembach <wse@tuxedocomputers.com>,
+        Konrad J Hambrick <kjhambrick@gmail.com>,
+        Calvin Walton <calvin.walton@kepstin.ca>,
+        =?UTF-8?q?Marek=20=C5=A0anta?= <teslan223@gmail.com>,
+        David Binderman <dcb314@hotmail.com>,
+        Alex Balcanquall <alex@alexbal.com>,
+        Mika Westerberg <mika.westerberg@linux.intel.com>
+Subject: [PATCH 0/5] thunderbolt: Couple of fixes and improvements
+Date:   Mon, 11 Sep 2023 13:04:40 +0300
+Message-Id: <20230911100445.3612655-1-mika.westerberg@linux.intel.com>
+X-Mailer: git-send-email 2.40.1
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+Precedence: bulk
+List-ID: <linux-usb.vger.kernel.org>
+X-Mailing-List: linux-usb@vger.kernel.org
+
+Hi all,
+
+This series contains fixes for various issues folks have reported and
+also a few not so critical improvements.
+
+I was planning to take patches 1-3 through my fixes branch into v6.6-rc
+and the patches 4 and 5 to my next branch where they can sit some more
+time in linux-next until they go into v6.7.
+
+Mika Westerberg (5):
+  thunderbolt: Workaround an IOMMU fault on certain systems with Intel Maple Ridge
+  thunderbolt: Check that lane 1 is in CL0 before enabling lane bonding
+  thunderbolt: Correct TMU mode initialization from hardware
+  thunderbolt: Apply USB 3.x bandwidth quirk only in software connection manager
+  thunderbolt: Restart XDomain discovery handshake after failure
+
+ drivers/thunderbolt/icm.c     | 40 ++++++++++++------------
+ drivers/thunderbolt/quirks.c  |  3 ++
+ drivers/thunderbolt/switch.c  |  7 +++++
+ drivers/thunderbolt/tmu.c     |  2 +-
+ drivers/thunderbolt/xdomain.c | 58 +++++++++++++++++++++++++----------
+ 5 files changed, 72 insertions(+), 38 deletions(-)
+
+-- 
+2.40.1
+
+
+From mboxrd@z Thu Jan  1 00:00:00 1970
+Return-Path: <linux-usb-owner@vger.kernel.org>
+X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
+	aws-us-west-2-korg-lkml-1.web.codeaurora.org
+Received: from vger.kernel.org (vger.kernel.org [23.128.96.18])
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 2FA32CA0EC3
+	for <linux-usb@archiver.kernel.org>; Mon, 11 Sep 2023 22:59:31 +0000 (UTC)
+Received: (majordomo@vger.kernel.org) by vger.kernel.org via listexpand
+        id S1350882AbjIKVmA (ORCPT <rfc822;linux-usb@archiver.kernel.org>);
+        Mon, 11 Sep 2023 17:42:00 -0400
+Received: from lindbergh.monkeyblade.net ([23.128.96.19]:39596 "EHLO
+        lindbergh.monkeyblade.net" rhost-flags-OK-OK-OK-OK) by vger.kernel.org
+        with ESMTP id S236256AbjIKKE5 (ORCPT
+        <rfc822;linux-usb@vger.kernel.org>); Mon, 11 Sep 2023 06:04:57 -0400
+Received: from mgamail.intel.com (mgamail.intel.com [134.134.136.31])
+        by lindbergh.monkeyblade.net (Postfix) with ESMTPS id C64F2E68
+        for <linux-usb@vger.kernel.org>; Mon, 11 Sep 2023 03:04:52 -0700 (PDT)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple;
+  d=intel.com; i=@intel.com; q=dns/txt; s=Intel;
+  t=1694426692; x=1725962692;
+  h=from:to:cc:subject:date:message-id:in-reply-to:
+   references:mime-version:content-transfer-encoding;
+  bh=PKr+r2A7w4fkYUGg7IwStLMBgtKmmOrekmzXaNpn630=;
+  b=cP+zszrU15f4bd6qi/su0yLI225lVZto4x7g0tY3QA8v5C8Q1TEi/eFW
+   bIW8Lqc6RwZgU+LNdPs5WMlpIxcxNBx9UlS4tOogYD9GDGuRMGrTb+oey
+   DoNMody/2TRXhVR8UcIk47rkIXB+rr6mdo3kDBfGGvB63JTJVmBxWAPOW
+   clvknoBG1t7EYNGMy5p7RaR9z8rXCT7u85WJQtoCZhnv+pr3kI4p/hrUo
+   7Oo1pdUYM+FlJRdINTTBUkOxR4E4HqFcGuvOXqjd59qdpYn2dK9ai9mod
+   ZXh6fFqOA1LgkGex+GrOg047meSGN9RU5ekDtZq9aq776HnxVNV4Qgpkf
+   g==;
+X-IronPort-AV: E=McAfee;i="6600,9927,10829"; a="442037123"
+X-IronPort-AV: E=Sophos;i="6.02,243,1688454000"; 
+   d="scan'208";a="442037123"
+Received: from fmsmga002.fm.intel.com ([10.253.24.26])
+  by orsmga104.jf.intel.com with ESMTP/TLS/ECDHE-RSA-AES256-GCM-SHA384; 11 Sep 2023 03:04:51 -0700
+X-ExtLoop1: 1
+X-IronPort-AV: E=McAfee;i="6600,9927,10829"; a="858263763"
+X-IronPort-AV: E=Sophos;i="6.02,243,1688454000"; 
+   d="scan'208";a="858263763"
+Received: from black.fi.intel.com ([10.237.72.28])
+  by fmsmga002.fm.intel.com with ESMTP; 11 Sep 2023 03:04:47 -0700
+Received: by black.fi.intel.com (Postfix, from userid 1001)
+        id C17249E2; Mon, 11 Sep 2023 13:04:45 +0300 (EEST)
+From:   Mika Westerberg <mika.westerberg@linux.intel.com>
+To:     linux-usb@vger.kernel.org
+Cc:     Yehezkel Bernat <YehezkelShB@gmail.com>,
+        Michael Jamet <michael.jamet@intel.com>,
+        Lukas Wunner <lukas@wunner.de>,
+        Andreas Noever <andreas.noever@gmail.com>,
+        Werner Sembach <wse@tuxedocomputers.com>,
+        Konrad J Hambrick <kjhambrick@gmail.com>,
+        Calvin Walton <calvin.walton@kepstin.ca>,
+        =?UTF-8?q?Marek=20=C5=A0anta?= <teslan223@gmail.com>,
+        David Binderman <dcb314@hotmail.com>,
+        Alex Balcanquall <alex@alexbal.com>,
+        Mika Westerberg <mika.westerberg@linux.intel.com>
+Subject: [PATCH 2/5] thunderbolt: Check that lane 1 is in CL0 before enabling lane bonding
+Date:   Mon, 11 Sep 2023 13:04:42 +0300
+Message-Id: <20230911100445.3612655-3-mika.westerberg@linux.intel.com>
+X-Mailer: git-send-email 2.40.1
+In-Reply-To: <20230911100445.3612655-1-mika.westerberg@linux.intel.com>
+References: <20230911100445.3612655-1-mika.westerberg@linux.intel.com>
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+Precedence: bulk
+List-ID: <linux-usb.vger.kernel.org>
+X-Mailing-List: linux-usb@vger.kernel.org
+
+Marek reported that when BlackMagic UltraStudio device is connected the
+kernel repeatedly tries to enable lane bonding without success making
+the device non-functional. It looks like the device does not have lane 1
+connected at all so even though it is enabled we should not try to bond
+the lanes. For this reason check that lane 1 is in fact CL0 (connected,
+active) before attempting to bond the lanes.
+
+Reported-by: Marek Šanta <teslan223@gmail.com>
+Closes: https://bugzilla.kernel.org/show_bug.cgi?id=217737
+Cc: stable@vger.kernel.org
+Signed-off-by: Mika Westerberg <mika.westerberg@linux.intel.com>
+---
+ drivers/thunderbolt/switch.c | 7 +++++++
+ 1 file changed, 7 insertions(+)
+
+diff --git a/drivers/thunderbolt/switch.c b/drivers/thunderbolt/switch.c
+index 43171cc1cc2d..bd5815f8f23b 100644
+--- a/drivers/thunderbolt/switch.c
++++ b/drivers/thunderbolt/switch.c
+@@ -2725,6 +2725,13 @@ int tb_switch_lane_bonding_enable(struct tb_switch *sw)
+ 	    !tb_port_is_width_supported(down, TB_LINK_WIDTH_DUAL))
+ 		return 0;
+ 
++	/*
++	 * Both lanes need to be in CL0. Here we assume lane 0 already be in
++	 * CL0 and check just for lane 1.
++	 */
++	if (tb_wait_for_port(down->dual_link_port, false) <= 0)
++		return -ENOTCONN;
++
+ 	ret = tb_port_lane_bonding_enable(up);
+ 	if (ret) {
+ 		tb_port_warn(up, "failed to enable lane bonding\n");
+-- 
+2.40.1
+
+
+From mboxrd@z Thu Jan  1 00:00:00 1970
+Received: from lindbergh.monkeyblade.net (lindbergh.monkeyblade.net [23.128.96.19])
+	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
+	(No client certificate requested)
+	by smtp.subspace.kernel.org (Postfix) with ESMTPS id DE64FD29A
+	for <linux-usb@vger.kernel.org>; Fri, 15 Sep 2023 10:11:00 +0000 (UTC)
+Received: from mgamail.intel.com (mgamail.intel.com [134.134.136.24])
+	by lindbergh.monkeyblade.net (Postfix) with ESMTPS id EC4FE1BCA
+	for <linux-usb@vger.kernel.org>; Fri, 15 Sep 2023 03:10:32 -0700 (PDT)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple;
+  d=intel.com; i=@intel.com; q=dns/txt; s=Intel;
+  t=1694772633; x=1726308633;
+  h=date:from:to:cc:subject:message-id:references:
+   mime-version:in-reply-to;
+  bh=J6DGDjIxdlClHVfcBX8AN2zdhVrWWEME9J+HGI8b6Ig=;
+  b=BQ8Nd4c1oAJnuQoTigSjfnuV2AogQR9PlpKYAGyV56PyydiqPGxYecZb
+   NZsq9VVtisHfajfHhk8iTNCa0/VklrFEU7bvjEv/QZjTwFyqDAcyIuWnG
+   idcGnoj4ld5F3IuiuS/kDokhTLclrgB7dGJh/4SSVuWQm3GBqVTfT73NC
+   FKXhWsCalgpvUtvJLPfGJsDVREJl5G8YZAt+cTsTAVjAC+k6w2dLdB5F8
+   qDOb9BmflST1SEedkDWn1mSYVhRptyL5ZEF/6EPkNeZa6q+GHwiY15Dr9
+   e57fk90aYwpBc6t1jhGFXosAF7ZfPPlO0R1VgxLyoQcJ5ggmnQPgTK+SM
+   g==;
+X-IronPort-AV: E=McAfee;i="6600,9927,10833"; a="381941823"
+X-IronPort-AV: E=Sophos;i="6.02,148,1688454000"; 
+   d="scan'208";a="381941823"
+Received: from orsmga005.jf.intel.com ([10.7.209.41])
+  by orsmga102.jf.intel.com with ESMTP/TLS/ECDHE-RSA-AES256-GCM-SHA384; 15 Sep 2023 03:10:28 -0700
+X-ExtLoop1: 1
+X-IronPort-AV: E=McAfee;i="6600,9927,10833"; a="918608666"
+X-IronPort-AV: E=Sophos;i="6.02,148,1688454000"; 
+   d="scan'208";a="918608666"
+Received: from black.fi.intel.com ([10.237.72.28])
+  by orsmga005.jf.intel.com with ESMTP; 15 Sep 2023 03:10:24 -0700
+Received: by black.fi.intel.com (Postfix, from userid 1001)
+	id 53BE98C9; Fri, 15 Sep 2023 13:10:23 +0300 (EEST)
+Date: Fri, 15 Sep 2023 13:10:23 +0300
+From: Mika Westerberg <mika.westerberg@linux.intel.com>
+To: linux-usb@vger.kernel.org
+Cc: Yehezkel Bernat <YehezkelShB@gmail.com>,
+	Michael Jamet <michael.jamet@intel.com>,
+	Lukas Wunner <lukas@wunner.de>,
+	Andreas Noever <andreas.noever@gmail.com>,
+	Werner Sembach <wse@tuxedocomputers.com>,
+	Konrad J Hambrick <kjhambrick@gmail.com>,
+	Calvin Walton <calvin.walton@kepstin.ca>,
+	Marek =?utf-8?B?xaBhbnRh?= <teslan223@gmail.com>,
+	David Binderman <dcb314@hotmail.com>,
+	Alex Balcanquall <alex@alexbal.com>
+Subject: Re: [PATCH 0/5] thunderbolt: Couple of fixes and improvements
+Message-ID: <20230915101023.GP1599918@black.fi.intel.com>
+References: <20230911100445.3612655-1-mika.westerberg@linux.intel.com>
+Precedence: bulk
+X-Mailing-List: linux-usb@vger.kernel.org
+List-Id: <linux-usb.vger.kernel.org>
+List-Subscribe: <mailto:linux-usb+subscribe@vger.kernel.org>
+List-Unsubscribe: <mailto:linux-usb+unsubscribe@vger.kernel.org>
+MIME-Version: 1.0
+Content-Type: text/plain; charset=utf-8
+Content-Disposition: inline
+In-Reply-To: <20230911100445.3612655-1-mika.westerberg@linux.intel.com>
+X-Spam-Status: No, score=-2.0 required=5.0 tests=BAYES_00,DKIMWL_WL_HIGH,
+	DKIM_SIGNED,DKIM_VALID,DKIM_VALID_EF,RCVD_IN_DNSWL_BLOCKED,
+	RCVD_IN_MSPIKE_H3,RCVD_IN_MSPIKE_WL,SPF_HELO_NONE,SPF_NONE
+	autolearn=ham autolearn_force=no version=3.4.6
+X-Spam-Checker-Version: SpamAssassin 3.4.6 (2021-04-09) on
+	lindbergh.monkeyblade.net
+
+On Mon, Sep 11, 2023 at 01:04:40PM +0300, Mika Westerberg wrote:
+> Hi all,
+> 
+> This series contains fixes for various issues folks have reported and
+> also a few not so critical improvements.
+> 
+> I was planning to take patches 1-3 through my fixes branch into v6.6-rc
+> and the patches 4 and 5 to my next branch where they can sit some more
+> time in linux-next until they go into v6.7.
+> 
+> Mika Westerberg (5):
+>   thunderbolt: Workaround an IOMMU fault on certain systems with Intel Maple Ridge
+>   thunderbolt: Check that lane 1 is in CL0 before enabling lane bonding
+>   thunderbolt: Correct TMU mode initialization from hardware
+
+Applied these to fixes.
+
+>   thunderbolt: Apply USB 3.x bandwidth quirk only in software connection manager
+>   thunderbolt: Restart XDomain discovery handshake after failure
+
+And decided to apply this too to fixes. I think this is pretty major
+problem if someone is using Thunderbolt/USB4 peer-to-peer.
+
+The patch 4 went into next as that's pretty cosmetic.
+
+From mboxrd@z Thu Jan  1 00:00:00 1970
+Received: from lindbergh.monkeyblade.net (lindbergh.monkeyblade.net [23.128.96.19])
+	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
+	(No client certificate requested)
+	by smtp.subspace.kernel.org (Postfix) with ESMTPS id 050DD101C7
+	for <linux-usb@vger.kernel.org>; Fri, 15 Sep 2023 11:12:31 +0000 (UTC)
+Received: from mgamail.intel.com (mgamail.intel.com [192.55.52.88])
+	by lindbergh.monkeyblade.net (Postfix) with ESMTPS id 11766101
+	for <linux-usb@vger.kernel.org>; Fri, 15 Sep 2023 04:12:31 -0700 (PDT)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple;
+  d=intel.com; i=@intel.com; q=dns/txt; s=Intel;
+  t=1694776351; x=1726312351;
+  h=date:from:to:cc:subject:message-id:references:
+   mime-version:in-reply-to;
+  bh=o8OiRiPbRlN/T3zx03c7liWSdJxgJvZI0GGT/VOSk/0=;
+  b=kmYB0dtoQt6wpQOrvG1RRjTRGeEpNB7R5CIjFVlIrU9BfzMz+1ITrPk2
+   q/CzmBSivx6Dgq4xgeUSDISmVD8hdP2NiNLc4aW4ZU1dHbZg4tTyemy+B
+   PyKLVpmBJmO7wMRIvTVBV7przwySXT0oatLKvOZqr1nRKuQeIpWdw7Ofx
+   3luMJy9RSiiAnNkjuxLP6B+T8MiFGN7RDGYzKTB8oemUDmzKtcuS8w1aD
+   OVw+lCq5seT1rgp+tMKehub3a+RZCvDDE1gLk8s8jW8VWigqvSCXu49oT
+   rl81gkE913mQOZVryVFGSxDmmVTXpCqwqkv6kNtpH81MxC41MAG8jwdF2
+   Q==;
+X-IronPort-AV: E=McAfee;i="6600,9927,10833"; a="410161803"
+X-IronPort-AV: E=Sophos;i="6.02,149,1688454000"; 
+   d="scan'208";a="410161803"
+Received: from orsmga008.jf.intel.com ([10.7.209.65])
+  by fmsmga101.fm.intel.com with ESMTP/TLS/ECDHE-RSA-AES256-GCM-SHA384; 15 Sep 2023 04:12:30 -0700
+X-ExtLoop1: 1
+X-IronPort-AV: E=McAfee;i="6600,9927,10833"; a="774275870"
+X-IronPort-AV: E=Sophos;i="6.02,149,1688454000"; 
+   d="scan'208";a="774275870"
+Received: from black.fi.intel.com ([10.237.72.28])
+  by orsmga008.jf.intel.com with ESMTP; 15 Sep 2023 04:12:27 -0700
+Received: by black.fi.intel.com (Postfix, from userid 1001)
+	id 397D58C9; Fri, 15 Sep 2023 14:12:25 +0300 (EEST)
+Date: Fri, 15 Sep 2023 14:12:25 +0300
+From: Mika Westerberg <mika.westerberg@linux.intel.com>
+To: Konrad J Hambrick <kjhambrick@gmail.com>
+Cc: linux-usb@vger.kernel.org, Yehezkel Bernat <YehezkelShB@gmail.com>,
+	Michael Jamet <michael.jamet@intel.com>,
+	Lukas Wunner <lukas@wunner.de>,
+	Andreas Noever <andreas.noever@gmail.com>,
+	Werner Sembach <wse@tuxedocomputers.com>,
+	Calvin Walton <calvin.walton@kepstin.ca>,
+	Marek =?utf-8?B?xaBhbnRh?= <teslan223@gmail.com>,
+	David Binderman <dcb314@hotmail.com>,
+	Alex Balcanquall <alex@alexbal.com>
+Subject: Re: [PATCH 0/5] thunderbolt: Couple of fixes and improvements
+Message-ID: <20230915111225.GQ1599918@black.fi.intel.com>
+References: <20230911100445.3612655-1-mika.westerberg@linux.intel.com>
+ <20230915101023.GP1599918@black.fi.intel.com>
+ <CANBHt+PT9S59C-4S4riUm03fs2RKGwfVKM6i20=YUN5_-FSnWg@mail.gmail.com>
+Precedence: bulk
+X-Mailing-List: linux-usb@vger.kernel.org
+List-Id: <linux-usb.vger.kernel.org>
+List-Subscribe: <mailto:linux-usb+subscribe@vger.kernel.org>
+List-Unsubscribe: <mailto:linux-usb+unsubscribe@vger.kernel.org>
+MIME-Version: 1.0
+Content-Type: text/plain; charset=utf-8
+Content-Disposition: inline
+In-Reply-To: <CANBHt+PT9S59C-4S4riUm03fs2RKGwfVKM6i20=YUN5_-FSnWg@mail.gmail.com>
+X-Spam-Status: No, score=-4.3 required=5.0 tests=BAYES_00,DKIMWL_WL_HIGH,
+	DKIM_SIGNED,DKIM_VALID,DKIM_VALID_EF,RCVD_IN_DNSWL_MED,
+	RCVD_IN_MSPIKE_H3,RCVD_IN_MSPIKE_WL,SPF_HELO_NONE,SPF_NONE
+	autolearn=ham autolearn_force=no version=3.4.6
+X-Spam-Checker-Version: SpamAssassin 3.4.6 (2021-04-09) on
+	lindbergh.monkeyblade.net
+
+Hi,
+
+On Fri, Sep 15, 2023 at 06:00:39AM -0500, Konrad J Hambrick wrote:
+>    Is there something you would like to have tested in this set of patches ?
+
+No need, you already provided all the necessary information on the
+bugzilla! Thanks a lot for testing! :)
+
