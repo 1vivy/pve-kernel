@@ -2,3 +2,5 @@ ubuntu-zesty
 *.prepared
 config-*.org
 proxmox-kernel-*/
+proxmox-*
+linux-*
