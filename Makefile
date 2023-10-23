@@ -41,14 +41,14 @@ MODULE_DIRS=$(ZFSDIR)
 # exported to debian/rules via debian/rules.d/dirs.mk
 DIRS=KERNEL_SRC ZFSDIR MODULES
 
-DSC=proxmox-kernel-$(KERNEL_MAJMIN)_$(KERNEL_VER)-$(KREL).dsc
-DST_DEB=$(PACKAGE)_$(KERNEL_VER)$(KREL)_$(ARCH).deb
-META_DEB=proxmox-kernel-$(KERNEL_MAJMIN)_$(KERNEL_VER)-$(KREL)_all.deb
-HDR_DEB=$(HDRPACKAGE)_$(KERNEL_VER)$(KREL)_$(ARCH).deb
-META_HDR_DEB=proxmox-headers-$(KERNEL_MAJMIN)_$(KERNEL_VER)-$(KREL)_all.deb
-USR_HDR_DEB=proxmox-kernel-libc-dev_$(KERNEL_VER)$(KREL)_$(ARCH).deb
-LINUX_TOOLS_DEB=linux-tools-$(KERNEL_MAJMIN)_$(KERNEL_VER)-$(KREL)_$(ARCH).deb
-LINUX_TOOLS_DBG_DEB=linux-tools-$(KERNEL_MAJMIN)-dbgsym_$(KERNEL_VER)-$(KREL)_$(ARCH).deb
+DSC=proxmox-kernel-$(KERNEL_MAJMIN)_$(KERNEL_VER)$(KERNEL_EXTRAVERSION)-$(KREL).dsc
+DST_DEB=$(PACKAGE)_$(KERNEL_VER)$(KERNEL_EXTRAVERSION)-$(KREL)_$(ARCH).deb
+META_DEB=proxmox-kernel-$(KERNEL_MAJMIN)_$(KERNEL_VER)$(KERNEL_EXTRAVERSION)-$(KREL)_all.deb
+HDR_DEB=$(HDRPACKAGE)_$(KERNEL_VER)$(KERNEL_EXTRAVERSION)-$(KREL)_$(ARCH).deb
+META_HDR_DEB=proxmox-headers-$(KERNEL_MAJMIN)_$(KERNEL_VER)$(KERNEL_EXTRAVERSION)-$(KREL)_all.deb
+USR_HDR_DEB=proxmox-kernel-libc-dev_$(KERNEL_VER)$(KERNEL_EXTRAVERSION)-$(KREL)_$(ARCH).deb
+LINUX_TOOLS_DEB=linux-tools-$(KERNEL_MAJMIN)_$(KERNEL_VER)$(KERNEL_EXTRAVERSION)-$(KREL)_$(ARCH).deb
+LINUX_TOOLS_DBG_DEB=linux-tools-$(KERNEL_MAJMIN)-dbgsym_$(KERNEL_VER)$(KERNEL_EXTRAVERSION)-$(KREL)_$(ARCH).deb
 
 DEBS=$(DST_DEB) $(META_DEB) $(HDR_DEB) $(META_HDR_DEB) $(LINUX_TOOLS_DEB) $(LINUX_TOOLS_DBG_DEB) # $(USR_HDR_DEB)
 
@@ -138,7 +138,7 @@ extract-kernel-version:
 	$(eval KERNEL_EXTRAVERSION := $(KEXTRAVERSION))
 # totally not inline shell function
 	$(eval ABINUM := $(shell echo $(KERNEL_MAJ).$(KERNEL_MIN).$(KERNEL_PATCHLEVEL)-$(KERNEL_EXTRAVERSION) | awk -F'[.-]' '{ for (i = 1; i <= NF; i++) { if ($$i ~ /^[0-9][0-9]*$$/) { printf("%02d", $$i); } else { printf("%s", $$i); } } }'))
-	$(eval KREL := $(ABINUM)$(shell date +%Y%m%d%H%M))
+	$(eval KREL := $(ABINUM)$(shell date +%y%m%d%H%M))
 
 	echo "KERNEL_MAJ=$(KERNEL_MAJ)" >> ubuntu-kernel_env.mk
 	echo "KERNEL_MIN=$(KERNEL_MIN)" >> ubuntu-kernel_env.mk
@@ -156,8 +156,12 @@ debian-changelog:
 	sed -e 's/@KVMAJMIN@/$(KERNEL_MAJMIN)/g' -e 's/@KVER@/$(KERNEL_VER)$(KERNEL_EXTRAVERSION)-$(KREL)/g' -e 's|@KSHA1@|$(KERNEL_SHA1)|g' \
 		-e 's/@BUILDTIME@/$(shell date +"%a, %d %b %Y %T %z")/g' < debian/changelog.in > debian/changelog
 
+debian-lintian:
+	rm -f debian/source/lintian-overrides
+	sed -e 's/@KVMAJMIN@/$(KERNEL_MAJMIN)/g' < debian/source/lintian-overrides.in > debian/source/lintian-overrides
+
 .PHONY: prep
-prep: submodule	clone-mainline extract-kernel-version debian-changelog
+prep: submodule	clone-mainline extract-kernel-version debian-changelog debian-lintian
 	cd $(ZFSONLINUX_SUBMODULE); make prep SHA1=$(ZFS_SHA1)
 
 .PHONY: upload

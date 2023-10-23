@@ -2,4 +2,4 @@ proxmox-kernel-@KVMAJMIN@ (@KVER@) bookworm; urgency=low
 
   Mainline build at commit: @KSHA1@
 
- -- 1vivy <1vivy@tutanota.com> @BUILDTIME@
+ -- 1vivy <1vivy@tutanota.com>  @BUILDTIME@
